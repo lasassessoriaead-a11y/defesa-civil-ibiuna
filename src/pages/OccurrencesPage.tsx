@@ -18,6 +18,7 @@ import {
   UserCheck,
   ChevronRight,
   Sparkles,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -112,6 +113,7 @@ export const OccurrencesPage: React.FC = () => {
     address: '',
     affectable_population: 0,
   })
+  const [isGeocoding, setIsGeocoding] = useState(false)
 
   // Load Data
   const loadData = async () => {
@@ -177,6 +179,40 @@ export const OccurrencesPage: React.FC = () => {
       ...occ,
     })
     setIsFormOpen(true)
+  }
+
+  const handleGeocode = async () => {
+    const address = formData.address?.trim()
+    if (!address) {
+      toast({ variant: 'destructive', title: 'Informe um endereço primeiro' })
+      return
+    }
+    setIsGeocoding(true)
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+      )
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        const lat = parseFloat(data[0].lat)
+        const lon = parseFloat(data[0].lon)
+        setFormData((prev) => ({ ...prev, latitude: lat, longitude: lon }))
+        toast({
+          title: 'Coordenadas encontradas',
+          description: `${lat.toFixed(5)}, ${lon.toFixed(5)}`,
+        })
+      } else {
+        toast({ variant: 'destructive', title: 'Endereço não encontrado' })
+      }
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao buscar endereço',
+        description: getErrorMessage(err),
+      })
+    } finally {
+      setIsGeocoding(false)
+    }
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -810,15 +846,66 @@ export const OccurrencesPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-slate-700">
-                  Endereço / Referência
-                </Label>
+            {/* Endereço com geocodificação via Nominatim (OpenStreetMap) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Endereço / Referência</Label>
+              <div className="flex gap-2">
                 <Input
                   placeholder="Ex: Av. Beira Rio, 450 - Centro"
                   value={formData.address || ''}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="h-9 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGeocode}
+                  disabled={isGeocoding || !formData.address?.trim()}
+                  className="h-9 shrink-0 text-xs whitespace-nowrap"
+                >
+                  {isGeocoding ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <MapPin className="w-3.5 h-3.5 mr-1.5" />
+                  )}
+                  Buscar coordenadas
+                </Button>
+              </div>
+            </div>
+
+            {/* Latitude / Longitude (numéricos, lado a lado) + População */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Latitude</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  placeholder="ex: -23.5505"
+                  value={formData.latitude ?? ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      latitude: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                  className="h-9 text-xs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Longitude</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  placeholder="ex: -46.6333"
+                  value={formData.longitude ?? ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      longitude: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
                   className="h-9 text-xs"
                 />
               </div>
