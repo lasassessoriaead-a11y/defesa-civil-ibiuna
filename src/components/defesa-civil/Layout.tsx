@@ -106,6 +106,8 @@ export const Layout: React.FC = () => {
     e.preventDefault()
     if (globalSearch.trim()) {
       navigate(`/ocorrencias?search=${encodeURIComponent(globalSearch.trim())}`)
+      setGlobalSearch('')
+      setIsMobileMenuOpen(false)
     }
   }
 

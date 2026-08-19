@@ -40,6 +40,9 @@ export const AssistantPage: React.FC = () => {
   const { toast } = useToast()
 
   const [conversationId, setConversationId] = useState<string | null>(null)
+  const [conversations, setConversations] = useState<
+    Array<{ id: string; title?: string; created?: string }>
+  >([])
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
       id: 'welcome',
@@ -50,6 +53,60 @@ export const AssistantPage: React.FC = () => {
   ])
   const [inputValue, setInputValue] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+
+  // Load user previous conversations
+  const loadConversations = async () => {
+    try {
+      const res = await fetch(pb.buildUrl('/backend/v1/chats'), {
+        headers: {
+          Authorization: pb.authStore.token ? `Bearer ${pb.authStore.token}` : '',
+        },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data)) {
+          setConversations(data)
+        }
+      }
+    } catch (err) {
+      console.warn('Erro ao carregar conversas do assistente:', err)
+    }
+  }
+
+  // Load messages from a specific conversation
+  const loadConversationMessages = async (convId: string) => {
+    try {
+      setConversationId(convId)
+      const res = await fetch(pb.buildUrl(`/backend/v1/chats/${convId}/messages`), {
+        headers: {
+          Authorization: pb.authStore.token ? `Bearer ${pb.authStore.token}` : '',
+        },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        if (Array.isArray(data)) {
+          const formatted: ChatMessage[] = data
+            .filter((m: any) => m.role === 'user' || (m.role === 'assistant' && m.content))
+            .map((m: any) => ({
+              id: m.id,
+              role: m.role,
+              content: m.content || '',
+              sources: m.citations ? m.citations.map((c: any) => c.source_id) : undefined,
+              created: m.created,
+            }))
+          if (formatted.length > 0) {
+            setMessages(formatted)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Erro ao carregar mensagens da conversa:', err)
+    }
+  }
+
+  useEffect(() => {
+    loadConversations()
+  }, [])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
@@ -117,22 +174,20 @@ export const AssistantPage: React.FC = () => {
         throw new Error(`Erro na comunicação com agente (HTTP ${res.status})`)
       }
 
-      if (res.body) {
-        const streamResult = await streamAgentChat(res.body, {
-          onDelta: (delta) => {
-            accumulatedText += delta
-            setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantMsgId ? { ...msg, content: accumulatedText } : msg
-              )
-            )
-          },
-        })
+      const streamResult = await streamAgentChat(res, {
+        onChunk: (deltaText, fullText) => {
+          accumulatedText = fullText
+          setMessages((prev) =>
+            prev.map((msg) => (msg.id === assistantMsgId ? { ...msg, content: fullText } : msg)),
+          )
+        },
+      })
 
-        if (streamResult.conversation_id) {
-          setConversationId(streamResult.conversation_id)
-        }
-      }    } catch (err: any) {
+      if (streamResult.conversation_id) {
+        setConversationId(streamResult.conversation_id)
+        loadConversations()
+      }
+    } catch (err: any) {
       console.error('Erro no streaming do agente:', err)
       toast({
         variant: 'destructive',
@@ -326,6 +381,30 @@ export const AssistantPage: React.FC = () => {
         </CardHeader>
 
         <CardContent className="p-4 space-y-4 text-xs overflow-y-auto flex-1">
+          {/* Recent Conversations history */}
+          {conversations.length > 0 && (
+            <div className="space-y-1.5 pb-3 border-b border-slate-100">
+              <span className="font-bold text-slate-800 block text-[11px] uppercase tracking-wide">
+                Histórico de Conversas
+              </span>
+              <div className="space-y-1 max-h-32 overflow-y-auto">
+                {conversations.map((conv) => (
+                  <button
+                    key={conv.id}
+                    onClick={() => loadConversationMessages(conv.id)}
+                    className={`w-full text-left p-1.5 rounded-lg text-[11px] truncate block transition-colors ${
+                      conversationId === conv.id
+                        ? 'bg-blue-100/70 text-blue-900 font-semibold'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    💬 {conv.title || 'Conversa sem título'}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Box 1: Enchentes */}
           <div className="p-3 bg-blue-50/60 rounded-lg border border-blue-100 space-y-1">
             <h5 className="font-bold text-blue-900 flex items-center gap-1.5">

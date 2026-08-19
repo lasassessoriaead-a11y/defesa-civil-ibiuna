@@ -34,6 +34,53 @@ import {
 import type { Occurrence, Shelter, Team, Supply, Alert, AffectedArea } from '@/types/defesa-civil'
 import { useRealtime } from '@/hooks/use-realtime'
 
+// Count-up animated number component
+const AnimatedCount: React.FC<{ value: number; duration?: number; suffix?: string }> = ({
+  value,
+  duration = 500,
+  suffix = '',
+}) => {
+  const [displayValue, setDisplayValue] = useState(0)
+  const prevValueRef = React.useRef(0)
+
+  useEffect(() => {
+    const startValue = prevValueRef.current
+    const diff = value - startValue
+    if (diff === 0) {
+      setDisplayValue(value)
+      return
+    }
+
+    const startTime = performance.now()
+    let animationFrameId: number
+
+    const updateNumber = (now: number) => {
+      const elapsed = now - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      // Ease out cubic
+      const easeOut = 1 - Math.pow(1 - progress, 3)
+      const current = Math.round(startValue + diff * easeOut)
+      setDisplayValue(current)
+
+      if (progress < 1) {
+        animationFrameId = requestAnimationFrame(updateNumber)
+      } else {
+        prevValueRef.current = value
+      }
+    }
+
+    animationFrameId = requestAnimationFrame(updateNumber)
+    return () => cancelAnimationFrame(animationFrameId)
+  }, [value, duration])
+
+  return (
+    <span>
+      {displayValue.toLocaleString('pt-BR')}
+      {suffix}
+    </span>
+  )
+}
+
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
 
@@ -176,8 +223,8 @@ export const Dashboard: React.FC = () => {
           <CardContent>
             <div className="flex items-baseline justify-between">
               <div className="text-3xl font-extrabold text-slate-900 tracking-tight">
-                {activeOccurrences.length}
-              </div>
+                <AnimatedCount value={activeOccurrences.length} />
+              </div>{' '}
               {criticalOccurrences.length > 0 && (
                 <Badge className="bg-red-600 text-white text-[10px] font-bold">
                   {criticalOccurrences.length} Críticas
@@ -206,7 +253,7 @@ export const Dashboard: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="text-3xl font-extrabold text-slate-900 tracking-tight">
-              {totalPopulationAtRisk.toLocaleString('pt-BR')}
+              <AnimatedCount value={totalPopulationAtRisk} />
             </div>
             <p className="text-[11px] text-slate-500 mt-1 flex items-center gap-1">
               <span>
@@ -232,7 +279,7 @@ export const Dashboard: React.FC = () => {
           <CardContent>
             <div className="flex items-baseline justify-between">
               <div className="text-3xl font-extrabold text-slate-900 tracking-tight">
-                {shelterOccupancyRate}%
+                <AnimatedCount value={shelterOccupancyRate} suffix="%" />
               </div>
               <span className="text-xs text-slate-500 font-medium">
                 {totalShelterOccupancy}/{totalShelterCapacity} vagas
@@ -269,8 +316,8 @@ export const Dashboard: React.FC = () => {
           <CardContent>
             <div className="flex items-baseline justify-between">
               <div className="text-3xl font-extrabold text-slate-900 tracking-tight">
-                {criticalSuppliesCount}
-              </div>
+                <AnimatedCount value={criticalSuppliesCount} />
+              </div>{' '}
               {criticalSuppliesCount > 0 && (
                 <Badge className="bg-amber-500 text-white text-[10px] font-bold">
                   Reposição Urgente

@@ -91,6 +91,8 @@ export const OccurrencesPage: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>('all')
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all')
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
+  const [currentPage, setCurrentPage] = useState(1)
+  const itemsPerPage = 8
 
   // Modals & Selected details
   const [isFormOpen, setIsFormOpen] = useState(false)
@@ -272,19 +274,25 @@ export const OccurrencesPage: React.FC = () => {
 
   // Filter list
   const filteredOccurrences = occurrences.filter((occ) => {
-    const matchesText =
+    const matchText =
       !searchText ||
       occ.title.toLowerCase().includes(searchText.toLowerCase()) ||
-      occ.address?.toLowerCase().includes(searchText.toLowerCase()) ||
-      occ.description?.toLowerCase().includes(searchText.toLowerCase())
+      occ.description?.toLowerCase().includes(searchText.toLowerCase()) ||
+      occ.address?.toLowerCase().includes(searchText.toLowerCase())
 
-    const matchesType = selectedType === 'all' || occ.type === selectedType
-    const matchesSeverity = selectedSeverity === 'all' || occ.severity === selectedSeverity
-    const matchesStatus = selectedStatus === 'all' || occ.status === selectedStatus
+    const matchType = selectedType === 'all' || occ.type === selectedType
+    const matchSeverity = selectedSeverity === 'all' || occ.severity === selectedSeverity
+    const matchStatus = selectedStatus === 'all' || occ.status === selectedStatus
 
-    return matchesText && matchesType && matchesSeverity && matchesStatus
+    return matchText && matchType && matchSeverity && matchStatus
   })
 
+  // Pagination calculation
+  const totalPages = Math.ceil(filteredOccurrences.length / itemsPerPage) || 1
+  const paginatedOccurrences = filteredOccurrences.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage,
+  )
   // Linked items for selected occurrence detail
   const linkedTeams = selectedOccurrence
     ? teams.filter((t) => t.current_occurrence === selectedOccurrence.id)
@@ -395,7 +403,7 @@ export const OccurrencesPage: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody className="divide-y divide-slate-100">
-              {filteredOccurrences.map((occ) => (
+              {paginatedOccurrences.map((occ) => (
                 <TableRow
                   key={occ.id}
                   onClick={() => {
@@ -506,6 +514,40 @@ export const OccurrencesPage: React.FC = () => {
             </TableBody>
           </Table>
         </div>
+
+        {/* Pagination Controls */}
+        {filteredOccurrences.length > itemsPerPage && (
+          <div className="flex items-center justify-between px-4 py-3 bg-slate-50 border-t border-slate-200 text-xs">
+            <span className="text-slate-500">
+              Mostrando {Math.min((currentPage - 1) * itemsPerPage + 1, filteredOccurrences.length)}{' '}
+              a {Math.min(currentPage * itemsPerPage, filteredOccurrences.length)} de{' '}
+              {filteredOccurrences.length} ocorrências
+            </span>
+            <div className="flex items-center gap-1.5">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                className="h-8 text-xs bg-white"
+              >
+                Anterior
+              </Button>
+              <span className="px-2 font-semibold text-slate-700">
+                Pág {currentPage} de {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={currentPage >= totalPages}
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                className="h-8 text-xs bg-white"
+              >
+                Próxima
+              </Button>
+            </div>
+          </div>
+        )}
       </Card>
 
       {/* Detail Drawer / Modal */}
