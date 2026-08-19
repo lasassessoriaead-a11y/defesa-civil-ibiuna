@@ -1,0 +1,108 @@
+import React from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { AuthProvider, useAuth } from '@/contexts/AuthContext'
+import { Layout } from '@/components/defesa-civil/Layout'
+import { LoginScreen } from '@/pages/LoginScreen'
+import { Dashboard } from '@/pages/Dashboard'
+import { OccurrencesPage } from '@/pages/OccurrencesPage'
+import { SheltersPage } from '@/pages/SheltersPage'
+import { TeamsPage } from '@/pages/TeamsPage'
+import { SuppliesPage } from '@/pages/SuppliesPage'
+import { AlertsPage } from '@/pages/AlertsPage'
+import { AffectedAreasPage } from '@/pages/AffectedAreasPage'
+import { AssistantPage } from '@/pages/AssistantPage'
+import NotFound from '@/pages/NotFound'
+import { Toaster } from '@/components/ui/toaster'
+
+// Protected Route wrapper
+const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAuth()
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[#0f172a] text-white">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-xs font-semibold tracking-wide text-blue-200 uppercase">
+            Autenticando na Defesa Civil...
+          </p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />
+  }
+
+  return <>{children}</>
+}
+
+// Unauthenticated Route wrapper (redirects to /painel if already logged in)
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated, isLoading } = useAuth()
+
+  if (isLoading) {
+    return null
+  }
+
+  if (isAuthenticated) {
+    return <Navigate to="/painel" replace />
+  }
+
+  return <>{children}</>
+}
+
+export const App: React.FC = () => {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Public Login Route */}
+          <Route
+            path="/login"
+            element={
+              <PublicRoute>
+                <LoginScreen />
+              </PublicRoute>
+            }
+          />
+
+          {/* Root redirect to Painel */}
+          <Route
+            path="/"
+            element={
+              <ProtectedRoute>
+                <Navigate to="/painel" replace />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Protected Routes inside Global Layout */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <Layout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/painel" element={<Dashboard />} />
+            <Route path="/ocorrencias" element={<OccurrencesPage />} />
+            <Route path="/abrigos" element={<SheltersPage />} />
+            <Route path="/equipes" element={<TeamsPage />} />
+            <Route path="/suprimentos" element={<SuppliesPage />} />
+            <Route path="/alertas" element={<AlertsPage />} />
+            <Route path="/areas-afetadas" element={<AffectedAreasPage />} />
+            <Route path="/assistente" element={<AssistantPage />} />
+          </Route>
+
+          {/* 404 Fallback */}
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+        <Toaster />
+      </BrowserRouter>
+    </AuthProvider>
+  )
+}
+
+export default App

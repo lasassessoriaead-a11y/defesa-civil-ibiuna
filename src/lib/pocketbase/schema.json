@@ -1,0 +1,597 @@
+{
+  "generatedAt": "2026-08-19T08:56:04.181Z",
+  "collections": [
+    {
+      "name": "users",
+      "type": "auth",
+      "apiRules": {
+        "list": "id = @request.auth.id",
+        "view": "id = @request.auth.id",
+        "create": "",
+        "update": "id = @request.auth.id",
+        "delete": "id = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "avatar",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX `idx_tokenKey__pb_users_auth_` ON `users` (`tokenKey`)",
+        "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email`) WHERE `email` != ''"
+      ]
+    },
+    {
+      "name": "occurrences",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "enchente",
+            "deslizamento",
+            "seca",
+            "tempestade",
+            "granizo",
+            "incendio_florestal",
+            "outro"
+          ]
+        },
+        {
+          "name": "severity",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["baixa", "media", "alta", "critica"]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["reportada", "em_andamento", "concluida", "cancelada"]
+        },
+        {
+          "name": "latitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "longitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "affectable_population",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "reported_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "resolved_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_occ_status ON occurrences (status)",
+        "CREATE INDEX idx_occ_type ON occurrences (type)",
+        "CREATE INDEX idx_occ_severity ON occurrences (severity)",
+        "CREATE INDEX idx_occ_created ON occurrences (created DESC)"
+      ]
+    },
+    {
+      "name": "shelters",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "latitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "longitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "capacity",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "occupancy",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ativo", "cheio", "inativo"]
+        },
+        {
+          "name": "contact",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_shelters_status ON shelters (status)"]
+    },
+    {
+      "name": "teams",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "resgate",
+            "saude",
+            "logistica",
+            "comunicacao",
+            "voluntarios",
+            "engenharia"
+          ]
+        },
+        {
+          "name": "leader_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "member_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["disponivel", "em_operacao", "descanso"]
+        },
+        {
+          "name": "current_occurrence",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "occurrences"
+        },
+        {
+          "name": "latitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "longitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_teams_status ON teams (status)",
+        "CREATE INDEX idx_teams_type ON teams (type)"
+      ]
+    },
+    {
+      "name": "supplies",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "category",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "agua",
+            "alimentos",
+            "medicamentos",
+            "roupas_cobertores",
+            "equipamentos",
+            "higiene",
+            "outros"
+          ]
+        },
+        {
+          "name": "quantity",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "unit",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["unidades", "litros", "quilos", "caixas", "kits"]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["disponivel", "critico", "esgotado"]
+        },
+        {
+          "name": "location",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "min_threshold",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_supplies_status ON supplies (status)",
+        "CREATE INDEX idx_supplies_category ON supplies (category)"
+      ]
+    },
+    {
+      "name": "alerts",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "enchente",
+            "deslizamento",
+            "seca",
+            "tempestade",
+            "granizo",
+            "incendio_florestal",
+            "outro"
+          ]
+        },
+        {
+          "name": "severity",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["informativo", "alerta", "perigo", "perigo_extremo"]
+        },
+        {
+          "name": "message",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "target_area",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "channel",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["sms", "whatsapp", "sirene", "redes_sociais", "todos"]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["rascunho", "enviado", "agendado"]
+        },
+        {
+          "name": "scheduled_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sent_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "related_occurrence",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "occurrences"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_alerts_status ON alerts (status)",
+        "CREATE INDEX idx_alerts_type ON alerts (type)",
+        "CREATE INDEX idx_alerts_created ON alerts (created DESC)"
+      ]
+    },
+    {
+      "name": "affected_areas",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "hazard_type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["enchente", "deslizamento", "seca", "tempestade", "outro"]
+        },
+        {
+          "name": "risk_level",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["baixo", "medio", "alto", "critico"]
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["monitorado", "evacuado", "interditado", "liberado"]
+        },
+        {
+          "name": "area_polygon",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "coordinates",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "affected_population",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_areas_risk ON affected_areas (risk_level)",
+        "CREATE INDEX idx_areas_status ON affected_areas (status)"
+      ]
+    }
+  ]
+}
