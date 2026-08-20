@@ -211,6 +211,20 @@ export const AffectedAreasPage: React.FC = () => {
     }
   }
 
+  const handleCoordinatesBlur = () => {
+    if (
+      formData.latitude !== undefined &&
+      formData.longitude !== undefined &&
+      !isNaN(formData.latitude) &&
+      !isNaN(formData.longitude)
+    ) {
+      setFormData((prev) => ({
+        ...prev,
+        coordinates: `${prev.latitude},${prev.longitude}`,
+      }))
+    }
+  }
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.name?.trim()) {
@@ -618,6 +632,7 @@ export const AffectedAreasPage: React.FC = () => {
                       latitude: e.target.value === '' ? undefined : Number(e.target.value),
                     })
                   }
+                  onBlur={handleCoordinatesBlur}
                   className="h-9 text-xs"
                 />
               </div>
@@ -635,6 +650,7 @@ export const AffectedAreasPage: React.FC = () => {
                       longitude: e.target.value === '' ? undefined : Number(e.target.value),
                     })
                   }
+                  onBlur={handleCoordinatesBlur}
                   className="h-9 text-xs"
                 />
               </div>
@@ -766,7 +782,17 @@ export const AffectedAreasPage: React.FC = () => {
                   allowDrawingPolygon={true}
                   polygonPoints={polygonDraft}
                   onPolygonChange={setPolygonDraft}
-                  center={polygonDraft.length > 0 ? polygonDraft[0] : [-23.5505, -46.6333]}
+                  center={
+                    formData.latitude !== undefined &&
+                    formData.longitude !== undefined &&
+                    !isNaN(formData.latitude) &&
+                    !isNaN(formData.longitude)
+                      ? [formData.latitude, formData.longitude]
+                      : polygonDraft.length > 0
+                        ? polygonDraft[0]
+                        : [-23.5505, -46.6333]
+                  }
+                  zoom={14}
                   showLayerToggles={false}
                 />
               )}
