@@ -1,14 +1,18 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
 import {
-  MapContainer,
-  TileLayer,
-  Marker,
+  MapContainer as RLMapContainer,
+  TileLayer as RLTileLayer,
+  Marker as RLMarker,
   Popup,
   Polygon,
   Polyline,
   useMap,
   useMapEvents,
 } from 'react-leaflet'
+
+const MapContainer = RLMapContainer as React.ComponentType<any>
+const TileLayer = RLTileLayer as React.ComponentType<any>
+const Marker = RLMarker as React.ComponentType<any>
 import L from 'leaflet'
 import {
   Layers,

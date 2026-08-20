@@ -13,6 +13,7 @@ import {
   Edit2,
   Trash2,
   Phone,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,6 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { InteractiveMap } from '@/components/defesa-civil/InteractiveMap'
 import { TeamStatusBadge, TEAM_STATUS_LABELS } from '@/components/defesa-civil/StatusBadges'
 import { teamsService, occurrencesService, getErrorMessage } from '@/services/defesa-civil'
 import type { Team, TeamType, TeamStatus, Occurrence } from '@/types/defesa-civil'
@@ -57,7 +59,7 @@ export const TeamsPage: React.FC = () => {
   const [mobilizeOccurrenceId, setMobilizeOccurrenceId] = useState('')
 
   // Form state
-  const [formData, setFormData] = useState<Partial<Team>>({
+  const [formData, setFormData] = useState<Partial<Team> & { address?: string }>({
     name: '',
     type: 'resgate',
     leader_name: '',
@@ -65,7 +67,9 @@ export const TeamsPage: React.FC = () => {
     status: 'disponivel',
     latitude: -23.5505,
     longitude: -46.6333,
+    address: '',
   })
+  const [isGeocoding, setIsGeocoding] = useState(false)
 
   const loadData = async () => {
     try {
@@ -99,14 +103,52 @@ export const TeamsPage: React.FC = () => {
       status: 'disponivel',
       latitude: -23.5505,
       longitude: -46.6333,
+      address: '',
     })
     setIsFormOpen(true)
   }
 
   const openEdit = (t: Team) => {
     setSelectedTeam(t)
-    setFormData({ ...t })
+    setFormData({
+      ...t,
+      address: '',
+    })
     setIsFormOpen(true)
+  }
+
+  const handleGeocode = async () => {
+    const address = formData.address?.trim()
+    if (!address) {
+      toast({ variant: 'destructive', title: 'Informe um endereço primeiro' })
+      return
+    }
+    setIsGeocoding(true)
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+      )
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        const lat = parseFloat(data[0].lat)
+        const lon = parseFloat(data[0].lon)
+        setFormData((prev) => ({ ...prev, latitude: lat, longitude: lon }))
+        toast({
+          title: 'Coordenadas encontradas',
+          description: `${lat.toFixed(5)}, ${lon.toFixed(5)}`,
+        })
+      } else {
+        toast({ variant: 'destructive', title: 'Endereço não encontrado' })
+      }
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao buscar endereço',
+        description: getErrorMessage(err),
+      })
+    } finally {
+      setIsGeocoding(false)
+    }
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -117,11 +159,12 @@ export const TeamsPage: React.FC = () => {
     }
 
     try {
+      const { address, ...teamPayload } = formData
       if (selectedTeam) {
-        await teamsService.update(selectedTeam.id, formData)
+        await teamsService.update(selectedTeam.id, teamPayload)
         toast({ title: 'Equipe atualizada com sucesso' })
       } else {
-        await teamsService.create(formData)
+        await teamsService.create(teamPayload)
         toast({ title: 'Equipe cadastrada com sucesso' })
       }
       setIsFormOpen(false)
@@ -444,18 +487,19 @@ export const TeamsPage: React.FC = () => {
 
       {/* Create / Edit Modal */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
-        <DialogContent className="max-w-lg bg-white">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader>
             <DialogTitle className="text-base font-bold text-slate-900">
               {selectedTeam ? 'Editar Equipe' : 'Cadastrar Nova Equipe'}
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Cadastre equipes operacionais com membros, líder e especialidade tática.
+              Cadastre equipes operacionais com membros, líder, especialidade tática e localização
+              base.
             </DialogDescription>
           </DialogHeader>
 
-          <form onSubmit={handleSave} className="space-y-3 text-xs">
-            <div className="space-y-1">
+          <form onSubmit={handleSave} className="space-y-4 text-xs">
+            <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700">
                 Nome da Equipe / Pelotão *
               </Label>
@@ -468,8 +512,8 @@ export const TeamsPage: React.FC = () => {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">Especialidade / Tipo</Label>
                 <Select
                   value={formData.type}
@@ -489,7 +533,19 @@ export const TeamsPage: React.FC = () => {
                 </Select>
               </div>
 
-              <div className="space-y-1">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">
+                  Nome do Líder / Oficial
+                </Label>
+                <Input
+                  placeholder="Ex: Capitão Roberto Mendes"
+                  value={formData.leader_name || ''}
+                  onChange={(e) => setFormData({ ...formData, leader_name: e.target.value })}
+                  className="h-9 text-xs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">
                   Quantidade de Membros
                 </Label>
@@ -505,35 +561,114 @@ export const TeamsPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold text-slate-700">
-                  Nome do Líder / Oficial
-                </Label>
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Status da Equipe</Label>
+              <Select
+                value={formData.status}
+                onValueChange={(v) => setFormData({ ...formData, status: v as TeamStatus })}
+              >
+                <SelectTrigger className="h-9 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="disponivel">Disponível na Base</SelectItem>
+                  <SelectItem value="em_operacao">Em Operação</SelectItem>
+                  <SelectItem value="descanso">Em Descanso / Turno</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {/* Endereço com geocodificação via Nominatim (OpenStreetMap) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">
+                Endereço da Base / Referência
+              </Label>
+              <div className="flex gap-2">
                 <Input
-                  placeholder="Ex: Capitão Roberto Mendes"
-                  value={formData.leader_name || ''}
-                  onChange={(e) => setFormData({ ...formData, leader_name: e.target.value })}
+                  placeholder="Ex: Av. Beira Rio, 450 - Centro"
+                  value={formData.address || ''}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="h-9 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGeocode}
+                  disabled={isGeocoding || !formData.address?.trim()}
+                  className="h-9 shrink-0 text-xs whitespace-nowrap"
+                >
+                  {isGeocoding ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <MapPin className="w-3.5 h-3.5 mr-1.5" />
+                  )}
+                  Buscar coordenadas
+                </Button>
+              </div>
+            </div>
+
+            {/* Latitude / Longitude (numéricos, lado a lado) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Latitude</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  placeholder="ex: -23.5505"
+                  value={formData.latitude ?? ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      latitude: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
                   className="h-9 text-xs"
                 />
               </div>
 
-              <div className="space-y-1">
-                <Label className="text-xs font-semibold text-slate-700">Status Inicial</Label>
-                <Select
-                  value={formData.status}
-                  onValueChange={(v) => setFormData({ ...formData, status: v as TeamStatus })}
-                >
-                  <SelectTrigger className="h-9 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="disponivel">Disponível</SelectItem>
-                    <SelectItem value="em_operacao">Em Operação</SelectItem>
-                    <SelectItem value="descanso">Descanso</SelectItem>
-                  </SelectContent>
-                </Select>
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Longitude</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  placeholder="ex: -46.6333"
+                  value={formData.longitude ?? ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      longitude: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                  className="h-9 text-xs"
+                />
               </div>
+            </div>
+
+            {/* Mini Interactive Map to pick Pin */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-slate-700">
+                  Posicionar Marcador no Mapa (Clique no mapa real para selecionar)
+                </Label>
+                <span className="text-[11px] font-mono text-slate-500">
+                  Lat: {formData.latitude?.toFixed(4)}, Lng: {formData.longitude?.toFixed(4)}
+                </span>
+              </div>
+              <InteractiveMap
+                height="240px"
+                interactivePick={true}
+                showLayerToggles={false}
+                pickedCoordinate={{
+                  lat: formData.latitude || -23.5505,
+                  lng: formData.longitude || -46.6333,
+                }}
+                onPickCoordinate={(lat, lng) => {
+                  setFormData({ ...formData, latitude: lat, longitude: lng })
+                }}
+                center={[formData.latitude || -23.5505, formData.longitude || -46.6333]}
+                zoom={14}
+              />
             </div>
 
             <DialogFooter className="pt-2">
