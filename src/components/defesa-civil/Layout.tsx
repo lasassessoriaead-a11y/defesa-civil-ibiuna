@@ -130,7 +130,7 @@ export const Layout: React.FC = () => {
             <h1 className="font-bold text-sm tracking-tight text-white leading-tight">
               DEFESA CIVIL
             </h1>
-            <p className="text-[11px] text-blue-400 font-medium">Gestão El Niño</p>
+            <p className="text-[11px] text-blue-400 font-medium">Gestão de Desastres</p>
           </div>
         </div>
 
@@ -436,7 +436,7 @@ export const Layout: React.FC = () => {
               Protocolo de Acionamento de Emergência
             </DialogTitle>
             <DialogDescription className="text-center text-slate-600 text-xs">
-              Disparo de prontidão máxima para eventos extremos do El Niño (inundações severas e
+              Disparo de prontidão máxima para eventos climáticos extremos (inundações severas e
               deslizamentos em massa).
             </DialogDescription>
           </DialogHeader>

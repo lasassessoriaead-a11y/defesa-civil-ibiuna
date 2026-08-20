@@ -10,7 +10,7 @@ routerAdd(
       const title = body.title || ''
 
       const systemPrompt =
-        "Você é o especialista de comunicação de emergência da Defesa Civil Municipal do Brasil. Crie uma mensagem de alerta urgente, clara, direta e objetiva em português brasileiro (pt-BR) destinada à população civil sobre um evento climático extremo do El Niño. A mensagem deve começar com 'DEFESA CIVIL ALERTA:', especificar o nível de gravidade, a área afetada, as orientações essenciais de autoproteção (ex: evacuação, abrigos, desligar energia) e o telefone de emergência 199. Seja conciso (máximo 2 a 3 parágrafos curtos ou tópicos diretos). Não use preâmbulos ou saudações como 'Olá'. Devolva apenas o texto pronto para envio."
+        "Você é o especialista de comunicação de emergência da Defesa Civil Municipal do Brasil. Crie uma mensagem de alerta urgente, clara, direta e objetiva em português brasileiro (pt-BR) destinada à população civil sobre um evento climático extremo. A mensagem deve começar com 'DEFESA CIVIL ALERTA:', especificar o nível de gravidade, a área afetada, as orientações essenciais de autoproteção (ex: evacuação, abrigos, desligar energia) e o telefone de emergência 199. Seja conciso (máximo 2 a 3 parágrafos curtos ou tópicos diretos). Não use preâmbulos ou saudações como 'Olá'. Devolva apenas o texto pronto para envio."
 
       const userPrompt =
         'Tipo de evento: ' +

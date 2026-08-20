@@ -106,7 +106,7 @@ export const LoginScreen: React.FC = () => {
         <div className="relative z-10 my-10 lg:my-0 space-y-6 max-w-lg">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500/20 border border-blue-400/30 text-blue-200 text-xs font-medium backdrop-blur-md">
             <Radio className="w-3.5 h-3.5 text-cyan-400 animate-pulse" />
-            Operação Especial El Niño 2026
+            Operação Especial 2026
           </div>
 
           <h2 className="text-3xl sm:text-4xl font-extrabold text-white leading-tight tracking-tight">

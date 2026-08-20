@@ -174,7 +174,7 @@ export const Dashboard: React.FC = () => {
             </span>
           </div>
           <h2 className="text-xl font-bold tracking-tight text-white">
-            Painel Geral de Resposta a Desastres — El Niño
+            Painel Geral de Resposta a Desastres
           </h2>
           <p className="text-xs text-blue-100/80">
             Monitoramento telemétrico integrado de bacias hidrográficas, encostas e unidades de
@@ -337,7 +337,7 @@ export const Dashboard: React.FC = () => {
           <div className="flex items-center gap-2">
             <div className="w-2.5 h-2.5 rounded-full bg-blue-600" />
             <CardTitle className="text-sm font-bold text-slate-800">
-              Mapa Operacional do Município — Camadas El Niño
+              Mapa Operacional do Município
             </CardTitle>
           </div>
           <span className="text-xs text-slate-500 hidden sm:inline">

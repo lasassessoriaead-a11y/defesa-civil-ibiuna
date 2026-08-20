@@ -48,7 +48,7 @@ export const AssistantPage: React.FC = () => {
       id: 'welcome',
       role: 'assistant',
       content:
-        'Olá, Operador! Sou o **Assistente Inteligente da Defesa Civil**. Estou conectado ao banco de dados em tempo real (ocorrências, abrigos, equipes, suprimentos e alertas) e carregado com protocolos operacionais do El Niño (inundações, deslizamentos, secas e vendavais).\n\nComo posso apoiar a operação hoje?',
+        'Olá, Operador! Sou o **Assistente Inteligente da Defesa Civil**. Estou conectado ao banco de dados em tempo real (ocorrências, abrigos, equipes, suprimentos e alertas) e carregado com protocolos operacionais de eventos climáticos extremos (inundações, deslizamentos, secas e vendavais).\n\nComo posso apoiar a operação hoje?',
     },
   ])
   const [inputValue, setInputValue] = useState('')
@@ -356,7 +356,7 @@ export const AssistantPage: React.FC = () => {
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             disabled={isStreaming}
-            placeholder="Pergunte sobre protocolos El Niño, ocorrências ou solicite redação..."
+            placeholder="Pergunte sobre protocolos operacionais, ocorrências ou solicite redação..."
             className="flex-1 h-10 text-xs rounded-xl bg-slate-50 focus:bg-white border-slate-200"
           />
           <Button
