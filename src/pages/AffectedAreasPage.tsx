@@ -586,26 +586,39 @@ export const AffectedAreasPage: React.FC = () => {
                   <MousePointerClick className="w-3.5 h-3.5 text-blue-600" />
                   Clique no mapa para adicionar vértices ao polígono ({polygonDraft.length} pontos)
                 </Label>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setPolygonDraft([])}
-                  className="h-6 text-[10px] text-red-600"
-                >
-                  Limpar Pontos
-                </Button>
+                <div className="flex items-center gap-1.5">
+                  {polygonDraft.length > 0 && (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setPolygonDraft((prev) => prev.slice(0, -1))}
+                      className="h-6 text-[10px] text-slate-600"
+                    >
+                      Desfazer último
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setPolygonDraft([])}
+                    className="h-6 text-[10px] text-red-600"
+                  >
+                    Limpar Pontos
+                  </Button>
+                </div>
               </div>
 
               <InteractiveMap
-                height="220px"
+                height="260px"
                 allowDrawingPolygon={true}
                 polygonPoints={polygonDraft}
                 onPolygonChange={setPolygonDraft}
                 center={polygonDraft.length > 0 ? polygonDraft[0] : [-23.5505, -46.6333]}
+                showLayerToggles={false}
               />
             </div>
-
             <DialogFooter className="pt-2">
               <Button
                 type="button"

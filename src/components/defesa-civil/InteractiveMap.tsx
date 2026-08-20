@@ -1,25 +1,246 @@
-import React, { useState, useEffect } from 'react'
+import React, { useEffect, useState, useMemo, useRef } from 'react'
 import {
-  MapPin,
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polygon,
+  Polyline,
+  useMap,
+  useMapEvents,
+} from 'react-leaflet'
+import L from 'leaflet'
+import {
   Layers,
   ZoomIn,
   ZoomOut,
-  Maximize2,
-  Minimize2,
   Navigation,
-  Eye,
-  EyeOff,
   AlertOctagon,
   Building2,
   Users,
-  Radio,
+  Maximize2,
+  Trash2,
+  MapPin,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import type { Occurrence, Shelter, Team, AffectedArea } from '@/types/defesa-civil'
 import { SeverityBadge, getHazardIcon } from './StatusBadges'
 
-interface InteractiveMapProps {
+// Helper to construct modern custom HTML markers with DivIcon
+function createDivIcon(
+  html: string,
+  className = '',
+  iconSize: [number, number] = [32, 32],
+  iconAnchor: [number, number] = [16, 16],
+) {
+  return L.divIcon({
+    html,
+    className: `custom-leaflet-marker ${className}`,
+    iconSize,
+    iconAnchor,
+    popupAnchor: [0, -iconAnchor[1]],
+  })
+}
+
+// Occurrence icons based on hazard type and severity
+function getOccurrenceIcon(occ: Occurrence, isSelected = false) {
+  let bgColor = '#059669' // low
+  if (occ.severity === 'critica') bgColor = '#dc2626'
+  else if (occ.severity === 'alta') bgColor = '#ea580c'
+  else if (occ.severity === 'media') bgColor = '#d97706'
+
+  const borderClass = isSelected ? 'border-yellow-400 ring-4 ring-yellow-400/40' : 'border-white'
+  const pulseClass = occ.severity === 'critica' ? 'animate-pulse' : ''
+  const size = isSelected ? 38 : 32
+  const anchor = isSelected ? 19 : 16
+
+  // SVG symbols
+  let iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`
+  if (occ.type === 'enchente') {
+    iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 14.899A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.5 8.242"/><path d="M16 14v6"/><path d="M8 14v6"/><path d="M12 16v6"/></svg>`
+  } else if (occ.type === 'deslizamento') {
+    iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83Z"/><path d="m22 17.65-9.17 4.16a2 2 0 0 1-1.66 0L2 17.65"/><path d="m22 12.65-9.17 4.16a2 2 0 0 1-1.66 0L2 12.65"/></svg>`
+  } else if (occ.type === 'incendio_florestal') {
+    iconSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z"/></svg>`
+  }
+
+  const html = `
+    <div style="background-color: ${bgColor}; width: ${size}px; height: ${size}px;" 
+         class="rounded-full flex items-center justify-center text-white shadow-lg border-2 ${borderClass} ${pulseClass} transition-all">
+      ${iconSvg}
+    </div>
+  `
+  return createDivIcon(html, '', [size, size], [anchor, anchor])
+}
+
+// Shelter icon
+function getShelterIcon(shelter: Shelter) {
+  const isFull = shelter.status === 'cheio' || (shelter.occupancy || 0) >= shelter.capacity
+  const bgColor = isFull ? '#b91c1c' : '#2563eb'
+  const html = `
+    <div style="background-color: ${bgColor}; width: 32px; height: 32px;" 
+         class="rounded-lg flex items-center justify-center text-white shadow-md border-2 border-white transition-all">
+      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg>
+    </div>
+  `
+  return createDivIcon(html, '', [32, 32], [16, 16])
+}
+
+// Team icon
+function getTeamIcon(team: Team) {
+  const isInOp = team.status === 'em_operacao'
+  const bgColor = isInOp ? '#9333ea' : '#059669'
+  const pulseClass = isInOp ? 'animate-pulse' : ''
+  const html = `
+    <div style="background-color: ${bgColor}; width: 30px; height: 30px;" 
+         class="rounded-full flex items-center justify-center text-white shadow-md border-2 border-white ${pulseClass} transition-all">
+      <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+    </div>
+  `
+  return createDivIcon(html, '', [30, 30], [15, 15])
+}
+
+// Picked Coordinate Pin Icon
+function getPickedPinIcon() {
+  const html = `
+    <div class="relative -translate-y-2 flex flex-col items-center">
+      <div class="w-8 h-8 rounded-full bg-red-600 border-2 border-white shadow-xl flex items-center justify-center text-white animate-bounce">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+      </div>
+      <div class="w-2 h-2 bg-red-800 rounded-full blur-[1px] -mt-0.5"></div>
+    </div>
+  `
+  return createDivIcon(html, '', [32, 42], [16, 40])
+}
+
+// Color and stroke settings for risk areas
+function getAreaStyle(riskLevel: string, status?: string) {
+  let color = '#059669' // baixo
+  let fillColor = '#059669'
+
+  if (riskLevel === 'critico') {
+    color = '#dc2626'
+    fillColor = '#ef4444'
+  } else if (riskLevel === 'alto') {
+    color = '#ea580c'
+    fillColor = '#f97316'
+  } else if (riskLevel === 'medio') {
+    color = '#d97706'
+    fillColor = '#f59e0b'
+  }
+
+  return {
+    color,
+    fillColor,
+    fillOpacity: 0.35,
+    weight: 2.5,
+    dashArray: status === 'interditado' ? '6, 6' : undefined,
+  }
+}
+
+// Controller component to handle map clicks for picking coords or drawing polygons
+interface MapEventsHandlerProps {
+  interactivePick?: boolean
+  onPickCoordinate?: (lat: number, lng: number) => void
+  allowDrawingPolygon?: boolean
+  polygonPoints?: [number, number][]
+  onPolygonChange?: (points: [number, number][]) => void
+}
+
+const MapEventsHandler: React.FC<MapEventsHandlerProps> = ({
+  interactivePick,
+  onPickCoordinate,
+  allowDrawingPolygon,
+  polygonPoints = [],
+  onPolygonChange,
+}) => {
+  useMapEvents({
+    click(e) {
+      const lat = Number(e.latlng.lat.toFixed(5))
+      const lng = Number(e.latlng.lng.toFixed(5))
+
+      if (allowDrawingPolygon && onPolygonChange) {
+        onPolygonChange([...polygonPoints, [lat, lng]])
+        return
+      }
+
+      if (interactivePick && onPickCoordinate) {
+        onPickCoordinate(lat, lng)
+      }
+    },
+  })
+  return null
+}
+
+// Controller component to sync map center / view when props update
+const MapViewController: React.FC<{
+  center: [number, number]
+  zoom?: number
+}> = ({ center, zoom }) => {
+  const map = useMap()
+  const prevCenterRef = useRef<[number, number] | null>(null)
+
+  useEffect(() => {
+    if (center && center[0] !== undefined && center[1] !== undefined) {
+      const isDifferent =
+        !prevCenterRef.current ||
+        Math.abs(prevCenterRef.current[0] - center[0]) > 0.0001 ||
+        Math.abs(prevCenterRef.current[1] - center[1]) > 0.0001
+
+      if (isDifferent) {
+        map.flyTo(center, zoom || map.getZoom(), { duration: 0.8 })
+        prevCenterRef.current = center
+      }
+    }
+  }, [center, zoom, map])
+
+  return null
+}
+
+// Custom map zoom/center controls inside Leaflet Container
+const CustomMapControls: React.FC<{
+  defaultCenter: [number, number]
+  defaultZoom: number
+}> = ({ defaultCenter, defaultZoom }) => {
+  const map = useMap()
+
+  return (
+    <div className="leaflet-top leaflet-right" style={{ pointerEvents: 'auto', margin: '10px' }}>
+      <div className="flex flex-col gap-1 bg-white/95 backdrop-blur-md p-1 rounded-lg border border-slate-300 shadow-md">
+        <Button
+          size="icon"
+          variant="ghost"
+          className="w-7 h-7 text-slate-700 hover:text-black hover:bg-slate-100"
+          onClick={() => map.zoomIn()}
+          title="Aproximar Zoom"
+        >
+          <ZoomIn className="w-4 h-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="w-7 h-7 text-slate-700 hover:text-black hover:bg-slate-100"
+          onClick={() => map.zoomOut()}
+          title="Afastar Zoom"
+        >
+          <ZoomOut className="w-4 h-4" />
+        </Button>
+        <Button
+          size="icon"
+          variant="ghost"
+          className="w-7 h-7 text-slate-700 hover:text-blue-600 hover:bg-blue-50"
+          onClick={() => map.setView(defaultCenter, defaultZoom)}
+          title="Centralizar Município"
+        >
+          <Navigation className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+export interface InteractiveMapProps {
   height?: string
   occurrences?: Occurrence[]
   shelters?: Shelter[]
@@ -35,15 +256,11 @@ interface InteractiveMapProps {
   allowDrawingPolygon?: boolean
   polygonPoints?: [number, number][]
   onPolygonChange?: (points: [number, number][]) => void
+  showLayerToggles?: boolean
 }
 
-// Default bounding box for visual mock map centered around standard municipal coordinates (-23.55, -46.63)
-const DEFAULT_CENTER = { lat: -23.5505, lng: -46.6333 }
-const LAT_RANGE = 0.08
-const LNG_RANGE = 0.12
-
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
-  height = '380px',
+  height = '400px',
   occurrences = [],
   shelters = [],
   teams = [],
@@ -54,526 +271,352 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   onPickCoordinate,
   pickedCoordinate,
   center = [-23.5505, -46.6333],
+  zoom = 13,
   allowDrawingPolygon = false,
   polygonPoints = [],
   onPolygonChange,
+  showLayerToggles = true,
 }) => {
-  const [zoomLevel, setZoomLevel] = useState<number>(1)
-  const [mapCenter, setMapCenter] = useState<{ lat: number; lng: number }>({
-    lat: center[0],
-    lng: center[1],
-  })
-
   // Layer toggles
   const [showOccurrences, setShowOccurrences] = useState(true)
   const [showAreas, setShowAreas] = useState(true)
   const [showShelters, setShowShelters] = useState(true)
   const [showTeams, setShowTeams] = useState(true)
-  const [activePopup, setActivePopup] = useState<{ type: string; item: any } | null>(null)
 
-  useEffect(() => {
-    if (center) {
-      setMapCenter({ lat: center[0], lng: center[1] })
+  // Validate initial center
+  const validCenter: [number, number] = useMemo(() => {
+    if (
+      Array.isArray(center) &&
+      center.length === 2 &&
+      typeof center[0] === 'number' &&
+      !isNaN(center[0]) &&
+      typeof center[1] === 'number' &&
+      !isNaN(center[1])
+    ) {
+      return center
     }
-  }, [center[0], center[1]])
-
-  // Convert lat/lng to percentage in container
-  const toMapPos = (lat: number, lng: number) => {
-    const latSpan = LAT_RANGE / zoomLevel
-    const lngSpan = LNG_RANGE / zoomLevel
-    const minLat = mapCenter.lat - latSpan / 2
-    const maxLat = mapCenter.lat + latSpan / 2
-    const minLng = mapCenter.lng - lngSpan / 2
-    const maxLng = mapCenter.lng + lngSpan / 2
-
-    const x = ((lng - minLng) / (maxLng - minLng)) * 100
-    const y = ((maxLat - lat) / (maxLat - minLat)) * 100 // inverted y
-    return { x, y }
-  }
-
-  // Convert click on map container to lat/lng
-  const handleMapClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect()
-    const clickX = (e.clientX - rect.left) / rect.width // 0 to 1
-    const clickY = (e.clientY - rect.top) / rect.height // 0 to 1
-
-    const latSpan = LAT_RANGE / zoomLevel
-    const lngSpan = LNG_RANGE / zoomLevel
-    const minLat = mapCenter.lat - latSpan / 2
-    const maxLat = mapCenter.lat + latSpan / 2
-    const minLng = mapCenter.lng - lngSpan / 2
-    const maxLng = mapCenter.lng + lngSpan / 2
-
-    const clickedLng = Number((minLng + clickX * (maxLng - minLng)).toFixed(5))
-    const clickedLat = Number((maxLat - clickY * (maxLat - minLat)).toFixed(5))
-
-    if (allowDrawingPolygon && onPolygonChange) {
-      onPolygonChange([...polygonPoints, [clickedLat, clickedLng]])
-      return
-    }
-
-    if (interactivePick && onPickCoordinate) {
-      onPickCoordinate(clickedLat, clickedLng)
-    }
-  }
-
-  // Color mapping by severity/risk
-  const getSeverityBg = (sev: string) => {
-    switch (sev) {
-      case 'critica':
-      case 'critico':
-      case 'perigo_extremo':
-        return 'bg-red-600 border-red-200 text-white animate-pulse'
-      case 'alta':
-      case 'alto':
-      case 'perigo':
-        return 'bg-orange-500 border-orange-200 text-white'
-      case 'media':
-      case 'medio':
-      case 'alerta':
-        return 'bg-amber-500 border-amber-200 text-white'
-      default:
-        return 'bg-emerald-600 border-emerald-200 text-white'
-    }
-  }
-
-  const getAreaColor = (risk: string) => {
-    switch (risk) {
-      case 'critico':
-        return { fill: 'rgba(220, 38, 38, 0.35)', stroke: '#dc2626' }
-      case 'alto':
-        return { fill: 'rgba(234, 88, 12, 0.35)', stroke: '#ea580c' }
-      case 'medio':
-        return { fill: 'rgba(217, 119, 6, 0.35)', stroke: '#d97706' }
-      default:
-        return { fill: 'rgba(5, 150, 105, 0.35)', stroke: '#059669' }
-    }
-  }
+    return [-23.5505, -46.6333]
+  }, [center])
 
   return (
     <div
-      className="relative w-full rounded-xl overflow-hidden border border-slate-200/80 shadow-inner bg-slate-900 select-none group"
+      className="relative w-full rounded-xl overflow-hidden border border-slate-300 shadow-inner bg-slate-100 group"
       style={{ height }}
     >
-      {/* Map Graphic Layer (Realistic SVG grid + styled topographic vectors) */}
-      <div className="absolute inset-0 cursor-crosshair overflow-hidden" onClick={handleMapClick}>
-        {/* Dark Carto/Satellite Hybrid Base Layer */}
-        <div className="absolute inset-0 bg-[#0f172a] bg-gradient-to-tr from-[#090d16] via-[#0f172a] to-[#1e293b]" />
+      {/* Real Interactive Leaflet OpenStreetMap */}
+      <MapContainer
+        center={validCenter}
+        zoom={zoom}
+        scrollWheelZoom={true}
+        style={{ height: '100%', width: '100%' }}
+        zoomControl={false}
+      >
+        {/* OpenStreetMap standard tiles (Fast, public, free, no API key needed) */}
+        <TileLayer
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          maxZoom={19}
+        />
 
-        {/* Dynamic coordinate grid */}
-        <svg
-          className="absolute inset-0 w-full h-full opacity-25"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <defs>
-            <pattern id="grid-pattern" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path
-                d="M 40 0 L 0 0 0 40"
-                fill="none"
-                stroke="#38bdf8"
-                strokeWidth="0.75"
-                strokeDasharray="3 3"
-              />
-            </pattern>
-          </defs>
-          <rect width="100%" height="100%" fill="url(#grid-pattern)" />
-        </svg>
+        {/* View controller & Click event listeners */}
+        <MapViewController center={validCenter} zoom={zoom} />
+        <MapEventsHandler
+          interactivePick={interactivePick}
+          onPickCoordinate={onPickCoordinate}
+          allowDrawingPolygon={allowDrawingPolygon}
+          polygonPoints={polygonPoints}
+          onPolygonChange={onPolygonChange}
+        />
+        <CustomMapControls defaultCenter={validCenter} defaultZoom={zoom} />
 
-        {/* River Waterway SVG representation for realistic topography */}
-        <svg
-          className="absolute inset-0 w-full h-full pointer-events-none opacity-40"
-          viewBox="0 0 100 100"
-          preserveAspectRatio="none"
-        >
-          <path
-            d="M 10,20 Q 30,35 45,50 T 80,75 T 95,90"
-            fill="none"
-            stroke="#0284c7"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-          />
-          <path
-            d="M 5,60 Q 25,65 45,50 T 70,30"
-            fill="none"
-            stroke="#0369a1"
-            strokeWidth="2"
-            strokeLinecap="round"
-          />
-          {/* Topographic Contour lines */}
-          <path
-            d="M 60,10 Q 75,25 90,15"
-            fill="none"
-            stroke="#475569"
-            strokeWidth="0.8"
-            strokeDasharray="2 2"
-          />
-          <path
-            d="M 55,18 Q 75,32 95,20"
-            fill="none"
-            stroke="#475569"
-            strokeWidth="0.8"
-            strokeDasharray="2 2"
-          />
-        </svg>
+        {/* Render Risk Areas (Polygons) */}
+        {showAreas &&
+          areas.map((area) => {
+            if (!area.area_polygon) return null
+            try {
+              const pts: [number, number][] = JSON.parse(area.area_polygon)
+              if (!Array.isArray(pts) || pts.length < 3) return null
 
-        {/* Render Polygons for Affected Areas */}
-        {showAreas && (
-          <svg
-            className="absolute inset-0 w-full h-full pointer-events-none"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-          >
-            {areas.map((area) => {
-              if (!area.area_polygon) return null
-              try {
-                const pts: [number, number][] = JSON.parse(area.area_polygon)
-                if (!Array.isArray(pts) || pts.length < 3) return null
-                const svgPts = pts
-                  .map(([pLat, pLng]) => {
-                    const { x, y } = toMapPos(pLat, pLng)
-                    return `${x},${y}`
-                  })
-                  .join(' ')
+              const style = getAreaStyle(area.risk_level, area.status)
 
-                const colors = getAreaColor(area.risk_level)
-
-                return (
-                  <g
-                    key={area.id}
-                    className="pointer-events-auto cursor-pointer"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setActivePopup({ type: 'area', item: area })
+              return (
+                <Polygon
+                  key={area.id}
+                  positions={pts}
+                  pathOptions={style}
+                  eventHandlers={{
+                    click: (e) => {
+                      L.DomEvent.stopPropagation(e)
                       onSelectItem?.('area', area)
-                    }}
-                  >
-                    <polygon
-                      points={svgPts}
-                      fill={colors.fill}
-                      stroke={colors.stroke}
-                      strokeWidth="1.5"
-                      strokeDasharray={area.status === 'interditado' ? '4 2' : undefined}
-                      className="transition-all hover:opacity-90 duration-200"
-                    />
-                  </g>
-                )
-              } catch (_) {
-                return null
-              }
-            })}
+                    },
+                  }}
+                >
+                  <Popup>
+                    <div className="p-1 min-w-[200px]">
+                      <div className="flex items-center gap-1.5 font-bold text-slate-900 text-sm">
+                        <Layers className="w-4 h-4 text-amber-600" />
+                        {area.name}
+                      </div>
+                      <div className="text-xs text-slate-600 mt-1 space-y-1">
+                        <p>{area.notes || 'Área de monitoramento preventivo.'}</p>
+                        <div className="flex items-center justify-between pt-1 font-medium">
+                          <span>
+                            População:{' '}
+                            <strong>{area.affected_population?.toLocaleString('pt-BR')}</strong>{' '}
+                            hab.
+                          </span>
+                          <span className="capitalize font-bold text-red-600">
+                            {area.risk_level}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </Popup>
+                </Polygon>
+              )
+            } catch (_) {
+              return null
+            }
+          })}
 
-            {/* Currently drawing polygon preview */}
-            {allowDrawingPolygon && polygonPoints.length > 0 && (
-              <polyline
-                points={polygonPoints
-                  .map(([pLat, pLng]) => {
-                    const { x, y } = toMapPos(pLat, pLng)
-                    return `${x},${y}`
-                  })
-                  .join(' ')}
-                fill="rgba(59, 130, 246, 0.2)"
-                stroke="#3b82f6"
-                strokeWidth="2"
-                strokeDasharray="3 3"
+        {/* Render Active Drawing Polygon Preview */}
+        {allowDrawingPolygon && polygonPoints.length > 0 && (
+          <>
+            {polygonPoints.length >= 3 ? (
+              <Polygon
+                positions={polygonPoints}
+                pathOptions={{
+                  color: '#2563eb',
+                  fillColor: '#3b82f6',
+                  fillOpacity: 0.3,
+                  dashArray: '5, 5',
+                  weight: 2,
+                }}
+              />
+            ) : (
+              <Polyline
+                positions={polygonPoints}
+                pathOptions={{
+                  color: '#2563eb',
+                  dashArray: '4, 4',
+                  weight: 2,
+                }}
               />
             )}
-          </svg>
+            {polygonPoints.map((pt, idx) => (
+              <Marker
+                key={`draft-pt-${idx}`}
+                position={pt}
+                icon={createDivIcon(
+                  `<div class="w-3.5 h-3.5 bg-blue-600 border-2 border-white rounded-full shadow"></div>`,
+                  '',
+                  [14, 14],
+                  [7, 7],
+                )}
+              />
+            ))}
+          </>
         )}
 
-        {/* Map Markers: Occurrences */}
+        {/* Render Occurrences Markers */}
         {showOccurrences &&
           occurrences.map((occ) => {
             if (occ.latitude === undefined || occ.longitude === undefined) return null
-            const { x, y } = toMapPos(occ.latitude, occ.longitude)
-            if (x < -5 || x > 105 || y < -5 || y > 105) return null
+            if (isNaN(occ.latitude) || isNaN(occ.longitude)) return null
 
             const isSelected = selectedItem?.type === 'occurrence' && selectedItem?.id === occ.id
+            const icon = getOccurrenceIcon(occ, isSelected)
 
             return (
-              <div
+              <Marker
                 key={occ.id}
-                style={{ left: `${x}%`, top: `${y}%` }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActivePopup({ type: 'occurrence', item: occ })
-                  onSelectItem?.('occurrence', occ)
+                position={[occ.latitude, occ.longitude]}
+                icon={icon}
+                eventHandlers={{
+                  click: () => onSelectItem?.('occurrence', occ),
                 }}
-                className={`absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer z-20 group/marker transition-all duration-300 ${
-                  isSelected ? 'scale-125 z-30' : 'hover:scale-115'
-                }`}
               >
-                <div
-                  className={`w-8 h-8 rounded-full flex items-center justify-center shadow-lg border-2 border-white transition-transform ${getSeverityBg(
-                    occ.severity,
-                  )}`}
-                >
-                  {getHazardIcon(occ.type, 'w-4 h-4 text-white')}
-                </div>
-                <div className="absolute top-9 left-1/2 -translate-x-1/2 hidden group-hover/marker:flex bg-slate-900/90 backdrop-blur text-white text-[11px] font-medium px-2 py-0.5 rounded shadow whitespace-nowrap pointer-events-none border border-slate-700">
-                  {occ.title.length > 24 ? occ.title.slice(0, 24) + '...' : occ.title}
-                </div>
-              </div>
+                <Popup>
+                  <div className="p-1 min-w-[220px]">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-900 text-sm">
+                      {getHazardIcon(occ.type, 'w-4 h-4')}
+                      <span>{occ.title}</span>
+                    </div>
+                    <p className="text-xs text-slate-600 mt-1 line-clamp-2">
+                      {occ.description || 'Sem descrição detalhada.'}
+                    </p>
+                    <div className="mt-2 pt-1 border-t border-slate-100 flex items-center justify-between text-xs">
+                      <SeverityBadge severity={occ.severity} />
+                      <span className="text-[11px] text-slate-500 truncate max-w-[120px]">
+                        {occ.address}
+                      </span>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
             )
           })}
 
-        {/* Map Markers: Shelters */}
+        {/* Render Shelters Markers */}
         {showShelters &&
           shelters.map((shelter) => {
             if (shelter.latitude === undefined || shelter.longitude === undefined) return null
-            const { x, y } = toMapPos(shelter.latitude, shelter.longitude)
-            if (x < -5 || x > 105 || y < -5 || y > 105) return null
+            if (isNaN(shelter.latitude) || isNaN(shelter.longitude)) return null
 
-            const isFull =
-              shelter.status === 'cheio' || (shelter.occupancy || 0) >= shelter.capacity
+            const icon = getShelterIcon(shelter)
 
             return (
-              <div
+              <Marker
                 key={shelter.id}
-                style={{ left: `${x}%`, top: `${y}%` }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActivePopup({ type: 'shelter', item: shelter })
-                  onSelectItem?.('shelter', shelter)
+                position={[shelter.latitude, shelter.longitude]}
+                icon={icon}
+                eventHandlers={{
+                  click: () => onSelectItem?.('shelter', shelter),
                 }}
-                className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer z-15 hover:scale-115 transition-transform"
               >
-                <div
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center shadow-md border-2 border-white ${
-                    isFull ? 'bg-red-700 text-white' : 'bg-blue-600 text-white'
-                  }`}
-                >
-                  <Building2 className="w-4 h-4" />
-                </div>
-              </div>
+                <Popup>
+                  <div className="p-1 min-w-[200px]">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-900 text-sm">
+                      <Building2 className="w-4 h-4 text-blue-600" />
+                      <span>{shelter.name}</span>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5">{shelter.address}</p>
+                    <div className="mt-2 pt-1 border-t border-slate-100 flex items-center justify-between text-xs font-semibold">
+                      <span>
+                        Vagas: {shelter.occupancy || 0}/{shelter.capacity}
+                      </span>
+                      <span
+                        className={
+                          shelter.status === 'cheio' ? 'text-red-600 font-bold' : 'text-emerald-600'
+                        }
+                      >
+                        {shelter.status === 'cheio' ? 'Lotado' : 'Disponível'}
+                      </span>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
             )
           })}
 
-        {/* Map Markers: Teams */}
+        {/* Render Teams Markers */}
         {showTeams &&
           teams.map((team) => {
             if (team.latitude === undefined || team.longitude === undefined) return null
-            const { x, y } = toMapPos(team.latitude, team.longitude)
-            if (x < -5 || x > 105 || y < -5 || y > 105) return null
+            if (isNaN(team.latitude) || isNaN(team.longitude)) return null
+
+            const icon = getTeamIcon(team)
 
             return (
-              <div
+              <Marker
                 key={team.id}
-                style={{ left: `${x}%`, top: `${y}%` }}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  setActivePopup({ type: 'team', item: team })
-                  onSelectItem?.('team', team)
+                position={[team.latitude, team.longitude]}
+                icon={icon}
+                eventHandlers={{
+                  click: () => onSelectItem?.('team', team),
                 }}
-                className="absolute -translate-x-1/2 -translate-y-1/2 cursor-pointer z-15 hover:scale-115 transition-transform"
               >
-                <div
-                  className={`w-7 h-7 rounded-full flex items-center justify-center shadow-md border-2 border-white ${
-                    team.status === 'em_operacao'
-                      ? 'bg-purple-600 text-white animate-pulse'
-                      : 'bg-emerald-600 text-white'
-                  }`}
-                >
-                  <Users className="w-3.5 h-3.5" />
-                </div>
-              </div>
+                <Popup>
+                  <div className="p-1 min-w-[190px]">
+                    <div className="flex items-center gap-1.5 font-bold text-slate-900 text-sm">
+                      <Users className="w-4 h-4 text-purple-600" />
+                      <span>{team.name}</span>
+                    </div>
+                    <div className="text-xs text-slate-600 mt-1 space-y-1">
+                      <p>Líder: {team.leader_name || 'Não informado'}</p>
+                      <div className="flex items-center justify-between pt-1 text-[11px] font-semibold">
+                        <span className="capitalize">
+                          {team.type} ({team.member_count} membros)
+                        </span>
+                        <span className="capitalize text-purple-700">
+                          {team.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
             )
           })}
 
-        {/* Interactively Picked Pin Coordinate */}
-        {pickedCoordinate && (
-          <div
-            style={{
-              left: `${toMapPos(pickedCoordinate.lat, pickedCoordinate.lng).x}%`,
-              top: `${toMapPos(pickedCoordinate.lat, pickedCoordinate.lng).y}%`,
-            }}
-            className="absolute -translate-x-1/2 -translate-y-full cursor-pointer z-40 animate-bounce"
-          >
-            <MapPin className="w-9 h-9 text-red-500 fill-red-500 stroke-white stroke-2 drop-shadow-md" />
-          </div>
-        )}
-      </div>
+        {/* Render Interactively Picked Pin Marker */}
+        {pickedCoordinate &&
+          pickedCoordinate.lat !== undefined &&
+          pickedCoordinate.lng !== undefined && (
+            <Marker
+              position={[pickedCoordinate.lat, pickedCoordinate.lng]}
+              icon={getPickedPinIcon()}
+            />
+          )}
+      </MapContainer>
 
-      {/* Floating Header Controls */}
-      <div className="absolute top-3 left-3 right-3 flex flex-wrap items-center justify-between gap-2 z-30 pointer-events-none">
-        {/* Layer filter chips */}
-        <div className="flex items-center gap-1.5 bg-slate-900/80 backdrop-blur-md px-2 py-1.5 rounded-lg border border-slate-700/80 shadow-md pointer-events-auto">
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowOccurrences(!showOccurrences)}
-            className={`h-7 px-2 text-xs font-medium rounded-md transition-all ${
-              showOccurrences
-                ? 'bg-red-500/20 text-red-300 border border-red-500/30'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <AlertOctagon className="w-3.5 h-3.5 mr-1 text-red-400" />
-            Ocorrências ({occurrences.length})
-          </Button>
-
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowAreas(!showAreas)}
-            className={`h-7 px-2 text-xs font-medium rounded-md transition-all ${
-              showAreas
-                ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5 mr-1 text-amber-400" />
-            Áreas de Risco ({areas.length})
-          </Button>
-
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowShelters(!showShelters)}
-            className={`h-7 px-2 text-xs font-medium rounded-md transition-all ${
-              showShelters
-                ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Building2 className="w-3.5 h-3.5 mr-1 text-blue-400" />
-            Abrigos ({shelters.length})
-          </Button>
-
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => setShowTeams(!showTeams)}
-            className={`h-7 px-2 text-xs font-medium rounded-md transition-all ${
-              showTeams
-                ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30'
-                : 'text-slate-400 hover:text-white'
-            }`}
-          >
-            <Users className="w-3.5 h-3.5 mr-1 text-purple-400" />
-            Equipes ({teams.length})
-          </Button>
-        </div>
-
-        {/* Map Zoom Controls */}
-        <div className="flex items-center gap-1 bg-slate-900/80 backdrop-blur-md p-1 rounded-lg border border-slate-700/80 shadow-md pointer-events-auto ml-auto">
-          <Button
-            size="icon"
-            variant="ghost"
-            className="w-7 h-7 text-slate-300 hover:text-white hover:bg-slate-800"
-            onClick={() => setZoomLevel((z) => Math.min(z + 0.3, 2.5))}
-            title="Aproximar Zoom"
-          >
-            <ZoomIn className="w-3.5 h-3.5" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="w-7 h-7 text-slate-300 hover:text-white hover:bg-slate-800"
-            onClick={() => setZoomLevel((z) => Math.max(z - 0.3, 0.7))}
-            title="Afastar Zoom"
-          >
-            <ZoomOut className="w-3.5 h-3.5" />
-          </Button>
-          <Button
-            size="icon"
-            variant="ghost"
-            className="w-7 h-7 text-slate-300 hover:text-white hover:bg-slate-800"
-            onClick={() => {
-              setZoomLevel(1)
-              setMapCenter(DEFAULT_CENTER)
-            }}
-            title="Centralizar Município"
-          >
-            <Navigation className="w-3.5 h-3.5" />
-          </Button>
-        </div>
-      </div>
-
-      {/* Floating Interactive Popup on Item Click */}
-      {activePopup && (
-        <div className="absolute bottom-3 left-3 max-w-sm w-[90%] sm:w-80 bg-white/95 backdrop-blur-md rounded-xl p-3.5 shadow-xl border border-slate-200 z-40 animate-fade-in-up">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-1.5">
-              {activePopup.type === 'occurrence' && getHazardIcon(activePopup.item.type, 'w-4 h-4')}
-              {activePopup.type === 'area' && <Layers className="w-4 h-4 text-amber-600" />}
-              {activePopup.type === 'shelter' && <Building2 className="w-4 h-4 text-blue-600" />}
-              {activePopup.type === 'team' && <Users className="w-4 h-4 text-purple-600" />}
-              <h4 className="font-semibold text-slate-900 text-sm leading-tight truncate">
-                {activePopup.item.name || activePopup.item.title}
-              </h4>
-            </div>
-            <button
-              onClick={() => setActivePopup(null)}
-              className="text-slate-400 hover:text-slate-700 text-xs font-bold px-1"
+      {/* Floating Layer Filter Chips */}
+      {showLayerToggles && (
+        <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 z-[1000] pointer-events-auto">
+          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-md p-1 rounded-lg border border-slate-300 shadow-md">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowOccurrences(!showOccurrences)}
+              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                showOccurrences
+                  ? 'bg-red-100 text-red-700 border border-red-200'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
             >
-              ✕
-            </button>
-          </div>
+              <AlertOctagon className="w-3.5 h-3.5 mr-1 text-red-600" />
+              Ocorrências ({occurrences.length})
+            </Button>
 
-          <div className="mt-2 text-xs text-slate-600 space-y-1">
-            {activePopup.type === 'occurrence' && (
-              <>
-                <p className="line-clamp-2">
-                  {activePopup.item.description || 'Sem descrição detalhada.'}
-                </p>
-                <div className="flex items-center justify-between pt-1">
-                  <SeverityBadge severity={activePopup.item.severity} />
-                  <span className="text-[11px] font-medium text-slate-500">
-                    {activePopup.item.address}
-                  </span>
-                </div>
-              </>
-            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowAreas(!showAreas)}
+              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                showAreas
+                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 mr-1 text-amber-600" />
+              Áreas de Risco ({areas.length})
+            </Button>
 
-            {activePopup.type === 'shelter' && (
-              <>
-                <p className="text-slate-500">{activePopup.item.address}</p>
-                <div className="flex items-center justify-between pt-1 font-medium">
-                  <span>
-                    Ocupação: {activePopup.item.occupancy || 0}/{activePopup.item.capacity}
-                  </span>
-                  <Badge variant={activePopup.item.status === 'cheio' ? 'destructive' : 'default'}>
-                    {activePopup.item.status === 'cheio' ? 'Lotado' : 'Disponível'}
-                  </Badge>
-                </div>
-              </>
-            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowShelters(!showShelters)}
+              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                showShelters
+                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5 mr-1 text-blue-600" />
+              Abrigos ({shelters.length})
+            </Button>
 
-            {activePopup.type === 'team' && (
-              <>
-                <p>Líder: {activePopup.item.leader_name || 'Não informado'}</p>
-                <div className="flex items-center justify-between pt-1">
-                  <Badge variant="outline" className="capitalize">
-                    {activePopup.item.type} ({activePopup.item.member_count} membros)
-                  </Badge>
-                  <span className="capitalize font-semibold text-purple-700">
-                    {activePopup.item.status.replace('_', ' ')}
-                  </span>
-                </div>
-              </>
-            )}
-
-            {activePopup.type === 'area' && (
-              <>
-                <p className="line-clamp-2">
-                  {activePopup.item.notes || 'Monitoramento preventivo em vigor.'}
-                </p>
-                <div className="flex items-center justify-between pt-1 font-medium">
-                  <span>
-                    População: {activePopup.item.affected_population?.toLocaleString('pt-BR')} hab.
-                  </span>
-                  <Badge className="capitalize">{activePopup.item.risk_level}</Badge>
-                </div>
-              </>
-            )}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowTeams(!showTeams)}
+              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                showTeams
+                  ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 mr-1 text-purple-600" />
+              Equipes ({teams.length})
+            </Button>
           </div>
         </div>
       )}
 
       {/* Mini Legend Footer */}
-      <div className="absolute bottom-2 right-3 hidden sm:flex items-center gap-3 bg-slate-900/80 backdrop-blur px-2.5 py-1 rounded-md border border-slate-700 text-[10px] text-slate-300 pointer-events-none">
+      <div className="absolute bottom-2 right-2 hidden sm:flex items-center gap-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-md border border-slate-300 text-[10px] text-slate-700 shadow-sm z-[1000] pointer-events-none font-medium">
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse" /> Crítico
+          <span className="w-2 h-2 rounded-full bg-red-600" /> Crítico
         </span>
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-orange-500" /> Alto
@@ -585,6 +628,18 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <span className="w-2 h-2 rounded-full bg-emerald-500" /> Baixo
         </span>
       </div>
+
+      {/* Helper hint for interactive pick or drawing */}
+      {(interactivePick || allowDrawingPolygon) && (
+        <div className="absolute bottom-2 left-2 z-[1000] bg-slate-900/90 text-white text-[11px] px-2.5 py-1 rounded-md shadow pointer-events-none flex items-center gap-1.5">
+          <MapPin className="w-3 h-3 text-red-400" />
+          <span>
+            {allowDrawingPolygon
+              ? 'Clique no mapa para adicionar os pontos do polígono de risco'
+              : 'Clique no mapa para posicionar as coordenadas'}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

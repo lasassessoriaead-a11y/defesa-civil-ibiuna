@@ -1,5 +1,21 @@
 /* Global styles - Theme, font, utilities, animations and global components */
 
+/* Leaflet styles */
+@import 'leaflet/dist/leaflet.css';
+
+/* Fix Leaflet map z-index and styles */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  font-family: inherit;
+}
+
+.custom-leaflet-marker {
+  background: transparent;
+  border: none;
+}
+
 /* CHANGE THE FONT BELOW TO WHATEVER YOU WANT */
 @import url('https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,100..900;1,100..900&display=swap');
 

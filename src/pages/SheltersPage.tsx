@@ -534,12 +534,18 @@ export const SheltersPage: React.FC = () => {
 
             {/* Map Pin Picker */}
             <div className="space-y-1 pt-1">
-              <Label className="text-xs font-semibold text-slate-700">
-                Ponto Georreferenciado no Mapa
-              </Label>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-slate-700">
+                  Ponto Georreferenciado no Mapa (Clique para marcar)
+                </Label>
+                <span className="text-[11px] font-mono text-slate-500">
+                  {formData.latitude?.toFixed(4)}, {formData.longitude?.toFixed(4)}
+                </span>
+              </div>
               <InteractiveMap
-                height="170px"
+                height="200px"
                 interactivePick={true}
+                showLayerToggles={false}
                 pickedCoordinate={{
                   lat: formData.latitude || -23.5505,
                   lng: formData.longitude || -46.6333,
@@ -548,9 +554,9 @@ export const SheltersPage: React.FC = () => {
                   setFormData({ ...formData, latitude: lat, longitude: lng })
                 }}
                 center={[formData.latitude || -23.5505, formData.longitude || -46.6333]}
+                zoom={14}
               />
             </div>
-
             <DialogFooter className="pt-2">
               <Button
                 type="button"

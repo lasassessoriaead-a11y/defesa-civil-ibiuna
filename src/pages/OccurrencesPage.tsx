@@ -943,15 +943,16 @@ export const OccurrencesPage: React.FC = () => {
             <div className="space-y-1.5">
               <div className="flex items-center justify-between">
                 <Label className="text-xs font-semibold text-slate-700">
-                  Posicionar Marcador no Mapa (Clique no mapa)
+                  Posicionar Marcador no Mapa (Clique no mapa real para selecionar)
                 </Label>
                 <span className="text-[11px] font-mono text-slate-500">
                   Lat: {formData.latitude?.toFixed(4)}, Lng: {formData.longitude?.toFixed(4)}
                 </span>
               </div>
               <InteractiveMap
-                height="200px"
+                height="240px"
                 interactivePick={true}
+                showLayerToggles={false}
                 pickedCoordinate={{
                   lat: formData.latitude || -23.5505,
                   lng: formData.longitude || -46.6333,
@@ -960,9 +961,9 @@ export const OccurrencesPage: React.FC = () => {
                   setFormData({ ...formData, latitude: lat, longitude: lng })
                 }}
                 center={[formData.latitude || -23.5505, formData.longitude || -46.6333]}
+                zoom={14}
               />
             </div>
-
             <DialogFooter className="pt-2">
               <Button
                 type="button"
