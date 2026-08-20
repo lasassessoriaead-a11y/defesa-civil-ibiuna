@@ -632,37 +632,6 @@ export const AffectedAreasPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Mini Interactive Map to pick Pin */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label className="text-xs font-semibold text-slate-700">
-                  Posicionar Marcador no Mapa (Clique no mapa real para selecionar)
-                </Label>
-                <span className="text-[11px] font-mono text-slate-500">
-                  Lat: {formData.latitude?.toFixed(4)}, Lng: {formData.longitude?.toFixed(4)}
-                </span>
-              </div>
-              <InteractiveMap
-                height="240px"
-                interactivePick={true}
-                showLayerToggles={false}
-                pickedCoordinate={{
-                  lat: formData.latitude || -23.5505,
-                  lng: formData.longitude || -46.6333,
-                }}
-                onPickCoordinate={(lat, lng) => {
-                  setFormData({
-                    ...formData,
-                    latitude: lat,
-                    longitude: lng,
-                    coordinates: `${lat},${lng}`,
-                  })
-                }}
-                center={[formData.latitude || -23.5505, formData.longitude || -46.6333]}
-                zoom={14}
-              />
-            </div>
-
             <div className="grid grid-cols-3 gap-3">
               <div className="space-y-1">
                 <Label className="text-xs font-semibold text-slate-700">Tipo de Ameaça</Label>
