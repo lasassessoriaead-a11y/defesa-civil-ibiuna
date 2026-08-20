@@ -177,13 +177,21 @@ const MapEventsHandler: React.FC<MapEventsHandlerProps> = ({
   return null
 }
 
-// Controller component to sync map center / view when props update
+// Controller component to sync map center / view and container size when props update
 const MapViewController: React.FC<{
   center: [number, number]
   zoom?: number
 }> = ({ center, zoom }) => {
   const map = useMap()
   const prevCenterRef = useRef<[number, number] | null>(null)
+
+  // Invalidate map size after mounting / rendering in dynamic dialogs/containers
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      map.invalidateSize()
+    }, 150)
+    return () => clearTimeout(timer)
+  }, [map])
 
   useEffect(() => {
     if (center && center[0] !== undefined && center[1] !== undefined) {
@@ -556,7 +564,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
       {/* Floating Layer Filter Chips */}
       {showLayerToggles && (
-        <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 z-[1000] pointer-events-auto">
+        <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 z-[400] pointer-events-auto">
           <div className="flex items-center gap-1 bg-white/95 backdrop-blur-md p-1 rounded-lg border border-slate-300 shadow-md">
             <Button
               size="sm"
@@ -618,7 +626,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       )}
 
       {/* Mini Legend Footer */}
-      <div className="absolute bottom-2 right-2 hidden sm:flex items-center gap-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-md border border-slate-300 text-[10px] text-slate-700 shadow-sm z-[1000] pointer-events-none font-medium">
+      <div className="absolute bottom-2 right-2 hidden sm:flex items-center gap-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-md border border-slate-300 text-[10px] text-slate-700 shadow-sm z-[400] pointer-events-none font-medium">
         <span className="flex items-center gap-1">
           <span className="w-2 h-2 rounded-full bg-red-600" /> Crítico
         </span>
@@ -635,7 +643,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
       {/* Helper hint for interactive pick or drawing */}
       {(interactivePick || allowDrawingPolygon) && (
-        <div className="absolute bottom-2 left-2 z-[1000] bg-slate-900/90 text-white text-[11px] px-2.5 py-1 rounded-md shadow pointer-events-none flex items-center gap-1.5">
+        <div className="absolute bottom-2 left-2 z-[400] bg-slate-900/90 text-white text-[11px] px-2.5 py-1 rounded-md shadow pointer-events-none flex items-center gap-1.5">
           <MapPin className="w-3 h-3 text-red-400" />
           <span>
             {allowDrawingPolygon

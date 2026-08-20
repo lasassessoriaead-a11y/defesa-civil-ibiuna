@@ -336,14 +336,22 @@ export const AffectedAreasPage: React.FC = () => {
           </span>
         </CardHeader>
         <CardContent className="p-0">
-          <InteractiveMap
-            height="440px"
-            areas={filteredAreas}
-            occurrences={occurrences}
-            onSelectItem={(type, item) => {
-              if (type === 'area') setSelectedArea(item)
-            }}
-          />
+          {/* Pause rendering background map when drawing modal is active to prevent multi-instance conflicts */}
+          {!isFormOpen ? (
+            <InteractiveMap
+              height="440px"
+              areas={filteredAreas}
+              occurrences={occurrences}
+              onSelectItem={(type, item) => {
+                if (type === 'area') setSelectedArea(item)
+              }}
+            />
+          ) : (
+            <div className="h-[440px] w-full bg-slate-100 flex flex-col items-center justify-center text-slate-400 gap-2 border border-dashed border-slate-300">
+              <Map className="w-8 h-8 text-slate-400 animate-pulse" />
+              <span className="text-xs font-medium">Modo de edição/desenho em andamento...</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -752,14 +760,16 @@ export const AffectedAreasPage: React.FC = () => {
                 </div>
               </div>
 
-              <InteractiveMap
-                height="260px"
-                allowDrawingPolygon={true}
-                polygonPoints={polygonDraft}
-                onPolygonChange={setPolygonDraft}
-                center={polygonDraft.length > 0 ? polygonDraft[0] : [-23.5505, -46.6333]}
-                showLayerToggles={false}
-              />
+              {isFormOpen && (
+                <InteractiveMap
+                  height="260px"
+                  allowDrawingPolygon={true}
+                  polygonPoints={polygonDraft}
+                  onPolygonChange={setPolygonDraft}
+                  center={polygonDraft.length > 0 ? polygonDraft[0] : [-23.5505, -46.6333]}
+                  showLayerToggles={false}
+                />
+              )}
             </div>
             <DialogFooter className="pt-2">
               <Button
