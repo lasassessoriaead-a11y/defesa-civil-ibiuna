@@ -12,6 +12,8 @@ import {
   Sparkles,
   MousePointerClick,
   Info,
+  MapPin,
+  Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -68,7 +70,9 @@ export const AffectedAreasPage: React.FC = () => {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
 
   // Form State with polygon coordinates
-  const [formData, setFormData] = useState<Partial<AffectedArea>>({
+  const [formData, setFormData] = useState<
+    Partial<AffectedArea> & { address?: string; latitude?: number; longitude?: number }
+  >({
     name: '',
     hazard_type: 'enchente',
     risk_level: 'critico',
@@ -76,7 +80,11 @@ export const AffectedAreasPage: React.FC = () => {
     affected_population: 1000,
     notes: '',
     coordinates: '-23.5505,-46.6333',
+    address: '',
+    latitude: -23.5505,
+    longitude: -46.6333,
   })
+  const [isGeocoding, setIsGeocoding] = useState(false)
 
   const [polygonDraft, setPolygonDraft] = useState<[number, number][]>([])
 
@@ -121,6 +129,9 @@ export const AffectedAreasPage: React.FC = () => {
       affected_population: 500,
       notes: '',
       coordinates: '-23.5505,-46.6333',
+      address: '',
+      latitude: -23.5505,
+      longitude: -46.6333,
     })
     setIsFormOpen(true)
   }
@@ -136,8 +147,68 @@ export const AffectedAreasPage: React.FC = () => {
       /* intentionally ignored */
     }
     setPolygonDraft(poly)
-    setFormData({ ...area })
+
+    let lat = -23.5505
+    let lng = -46.6333
+    if (area.coordinates && area.coordinates.includes(',')) {
+      const parts = area.coordinates.split(',')
+      const pLat = parseFloat(parts[0])
+      const pLng = parseFloat(parts[1])
+      if (!isNaN(pLat) && !isNaN(pLng)) {
+        lat = pLat
+        lng = pLng
+      }
+    } else if (poly.length > 0) {
+      lat = poly[0][0]
+      lng = poly[0][1]
+    }
+
+    setFormData({
+      ...area,
+      address: '',
+      latitude: lat,
+      longitude: lng,
+    })
     setIsFormOpen(true)
+  }
+
+  const handleGeocode = async () => {
+    const address = formData.address?.trim()
+    if (!address) {
+      toast({ variant: 'destructive', title: 'Informe um endereço primeiro' })
+      return
+    }
+    setIsGeocoding(true)
+    try {
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
+      )
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) {
+        const lat = parseFloat(data[0].lat)
+        const lon = parseFloat(data[0].lon)
+        setFormData((prev) => ({
+          ...prev,
+          latitude: lat,
+          longitude: lon,
+          coordinates: `${lat},${lon}`,
+        }))
+        toast({
+          title: 'Coordenadas encontradas',
+          description: `${lat.toFixed(5)}, ${lon.toFixed(5)}`,
+        })
+      } else {
+        toast({ variant: 'destructive', title: 'Endereço não encontrado' })
+      }
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao buscar endereço',
+        description: getErrorMessage(err),
+      })
+    } finally {
+      setIsGeocoding(false)
+    }
   }
 
   const handleSave = async (e: React.FormEvent) => {
@@ -147,13 +218,19 @@ export const AffectedAreasPage: React.FC = () => {
       return
     }
 
-    const payload: Partial<AffectedArea> = {
-      ...formData,
-      area_polygon: JSON.stringify(polygonDraft),
-      coordinates:
-        polygonDraft.length > 0
+    const { address, latitude, longitude, ...restFormData } = formData
+
+    const coordinates =
+      latitude !== undefined && longitude !== undefined
+        ? `${latitude},${longitude}`
+        : polygonDraft.length > 0
           ? `${polygonDraft[0][0]},${polygonDraft[0][1]}`
-          : '-23.5505,-46.6333',
+          : '-23.5505,-46.6333'
+
+    const payload: Partial<AffectedArea> = {
+      ...restFormData,
+      area_polygon: JSON.stringify(polygonDraft),
+      coordinates,
     }
 
     try {
@@ -487,6 +564,102 @@ export const AffectedAreasPage: React.FC = () => {
                 value={formData.name || ''}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                 className="h-9 text-xs"
+              />
+            </div>
+
+            {/* Endereço com geocodificação via Nominatim (OpenStreetMap) */}
+            <div className="space-y-1.5">
+              <Label className="text-xs font-semibold text-slate-700">Endereço / Referência</Label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Ex: Av. Beira Rio, 450 - Centro"
+                  value={formData.address || ''}
+                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                  className="h-9 text-xs"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleGeocode}
+                  disabled={isGeocoding || !formData.address?.trim()}
+                  className="h-9 shrink-0 text-xs whitespace-nowrap"
+                >
+                  {isGeocoding ? (
+                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                  ) : (
+                    <MapPin className="w-3.5 h-3.5 mr-1.5" />
+                  )}
+                  Buscar coordenadas
+                </Button>
+              </div>
+            </div>
+
+            {/* Latitude / Longitude (numéricos, lado a lado) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Latitude</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  placeholder="ex: -23.5505"
+                  value={formData.latitude ?? ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      latitude: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                  className="h-9 text-xs"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">Longitude</Label>
+                <Input
+                  type="number"
+                  step="any"
+                  placeholder="ex: -46.6333"
+                  value={formData.longitude ?? ''}
+                  onChange={(e) =>
+                    setFormData({
+                      ...formData,
+                      longitude: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                  className="h-9 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Mini Interactive Map to pick Pin */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <Label className="text-xs font-semibold text-slate-700">
+                  Posicionar Marcador no Mapa (Clique no mapa real para selecionar)
+                </Label>
+                <span className="text-[11px] font-mono text-slate-500">
+                  Lat: {formData.latitude?.toFixed(4)}, Lng: {formData.longitude?.toFixed(4)}
+                </span>
+              </div>
+              <InteractiveMap
+                height="240px"
+                interactivePick={true}
+                showLayerToggles={false}
+                pickedCoordinate={{
+                  lat: formData.latitude || -23.5505,
+                  lng: formData.longitude || -46.6333,
+                }}
+                onPickCoordinate={(lat, lng) => {
+                  setFormData({
+                    ...formData,
+                    latitude: lat,
+                    longitude: lng,
+                    coordinates: `${lat},${lng}`,
+                  })
+                }}
+                center={[formData.latitude || -23.5505, formData.longitude || -46.6333]}
+                zoom={14}
               />
             </div>
 
