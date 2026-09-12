@@ -1,5 +1,15 @@
 import pb from '@/lib/pocketbase/client'
-import type { Occurrence, Shelter, Team, Supply, Alert, AffectedArea } from '@/types/defesa-civil'
+import type {
+  Occurrence,
+  Shelter,
+  Team,
+  Supply,
+  Alert,
+  AffectedArea,
+  WhatsAppMessage,
+  AppSetting,
+  WhatsAppConfigInfo,
+} from '@/types/defesa-civil'
 
 // Helper to normalize PB errors
 export function getErrorMessage(err: unknown, fallback: string = 'Ocorreu um erro'): string {
@@ -151,5 +161,84 @@ export const affectedAreasService = {
   },
   async delete(id: string) {
     return pb.collection('affected_areas').delete(id)
+  },
+}
+
+// WhatsApp Service
+export const whatsappService = {
+  async listMessages(filter?: string, sort = '-created') {
+    return pb.collection('whatsapp_messages').getFullList<WhatsAppMessage>({
+      filter,
+      sort,
+      expand: 'occurrence',
+      requestKey: null,
+    })
+  },
+  async getMessagesForNumber(phoneNumber: string) {
+    const clean = phoneNumber.replace(/\D/g, '')
+    // Match either from_number or to_number containing the clean number
+    return pb.collection('whatsapp_messages').getFullList<WhatsAppMessage>({
+      filter: `from_number ~ "${clean}" || to_number ~ "${clean}"`,
+      sort: 'created',
+      expand: 'occurrence',
+      requestKey: null,
+    })
+  },
+  async sendMessage(params: { to: string; message: string; occurrence_id?: string }) {
+    const res = await pb.send('/backend/v1/whatsapp/send', {
+      method: 'POST',
+      body: JSON.stringify(params),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    return res as {
+      success: boolean
+      sid?: string
+      warning?: string
+      error?: string
+      record?: WhatsAppMessage
+    }
+  },
+  async getConfig(): Promise<WhatsAppConfigInfo> {
+    const res = await pb.send('/backend/v1/whatsapp/config', {
+      method: 'GET',
+    })
+    return res as WhatsAppConfigInfo
+  },
+}
+
+// App Settings Service
+export const appSettingsService = {
+  async get(key: string, defaultValue = ''): Promise<string> {
+    try {
+      const records = await pb.collection('app_settings').getList<AppSetting>(1, 1, {
+        filter: `key = "${key}"`,
+        requestKey: null,
+      })
+      if (records.items.length > 0) {
+        return records.items[0].value
+      }
+      return defaultValue
+    } catch {
+      return defaultValue
+    }
+  },
+  async set(key: string, value: string, description?: string): Promise<AppSetting> {
+    const records = await pb.collection('app_settings').getList<AppSetting>(1, 1, {
+      filter: `key = "${key}"`,
+      requestKey: null,
+    })
+    if (records.items.length > 0) {
+      return pb.collection('app_settings').update<AppSetting>(records.items[0].id, {
+        value,
+        description: description || records.items[0].description,
+      })
+    }
+    return pb.collection('app_settings').create<AppSetting>({
+      key,
+      value,
+      description,
+    })
   },
 }

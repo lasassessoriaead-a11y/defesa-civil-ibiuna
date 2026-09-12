@@ -8,6 +8,7 @@ import {
   Users,
   Package,
   Bell,
+  MessageSquare,
   Map,
   Bot,
   Search,
@@ -51,6 +52,7 @@ const navItems: NavItem[] = [
   { title: 'Equipes', href: '/equipes', icon: Users },
   { title: 'Suprimentos', href: '/suprimentos', icon: Package },
   { title: 'Alertas', href: '/alertas', icon: Bell },
+  { title: 'WhatsApp', href: '/whatsapp', icon: MessageSquare },
   { title: 'Áreas Afetadas', href: '/areas-afetadas', icon: Map },
   { title: 'Assistente IA', href: '/assistente', icon: Bot },
 ]

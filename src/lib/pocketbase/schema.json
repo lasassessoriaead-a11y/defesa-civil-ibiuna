@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-20T02:24:44.633Z",
+  "generatedAt": "2026-09-12T19:12:59.397Z",
   "collections": [
     {
       "name": "users",
@@ -592,6 +592,137 @@
         "CREATE INDEX idx_areas_risk ON affected_areas (risk_level)",
         "CREATE INDEX idx_areas_status ON affected_areas (status)"
       ]
+    },
+    {
+      "name": "whatsapp_messages",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "direction",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["incoming", "outgoing"]
+        },
+        {
+          "name": "from_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "to_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "body",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["received", "sent", "failed", "draft"]
+        },
+        {
+          "name": "occurrence",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "occurrences"
+        },
+        {
+          "name": "twilio_sid",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "error",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_wa_from ON whatsapp_messages (from_number)",
+        "CREATE INDEX idx_wa_to ON whatsapp_messages (to_number)",
+        "CREATE INDEX idx_wa_direction ON whatsapp_messages (direction)",
+        "CREATE INDEX idx_wa_status ON whatsapp_messages (status)",
+        "CREATE INDEX idx_wa_created ON whatsapp_messages (created DESC)"
+      ]
+    },
+    {
+      "name": "app_settings",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "key",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "value",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_app_settings_key ON app_settings (key)"]
     }
   ]
 }

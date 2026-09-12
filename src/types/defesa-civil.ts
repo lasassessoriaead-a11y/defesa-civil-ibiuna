@@ -146,3 +146,35 @@ export interface User {
   name?: string
   avatar?: string
 }
+
+export type WhatsAppDirection = 'incoming' | 'outgoing'
+export type WhatsAppStatus = 'received' | 'sent' | 'failed' | 'draft'
+
+export interface WhatsAppMessage extends RecordModel {
+  direction: WhatsAppDirection
+  from_number: string
+  to_number: string
+  body: string
+  status: WhatsAppStatus
+  occurrence?: string
+  twilio_sid?: string
+  error?: string
+  expand?: {
+    occurrence?: Occurrence
+  }
+}
+
+export interface AppSetting extends RecordModel {
+  key: string
+  value: string
+  description?: string
+}
+
+export interface WhatsAppConfigInfo {
+  configured: boolean
+  account_sid_configured: boolean
+  auth_token_configured: boolean
+  account_sid_masked: string
+  whatsapp_number: string
+  webhook_url: string
+}

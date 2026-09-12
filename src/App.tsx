@@ -9,6 +9,7 @@ import { SheltersPage } from '@/pages/SheltersPage'
 import { TeamsPage } from '@/pages/TeamsPage'
 import { SuppliesPage } from '@/pages/SuppliesPage'
 import { AlertsPage } from '@/pages/AlertsPage'
+import { WhatsAppPage } from '@/pages/WhatsAppPage'
 import { AffectedAreasPage } from '@/pages/AffectedAreasPage'
 import { AssistantPage } from '@/pages/AssistantPage'
 import NotFound from '@/pages/NotFound'
@@ -92,6 +93,7 @@ export const App: React.FC = () => {
             <Route path="/equipes" element={<TeamsPage />} />
             <Route path="/suprimentos" element={<SuppliesPage />} />
             <Route path="/alertas" element={<AlertsPage />} />
+            <Route path="/whatsapp" element={<WhatsAppPage />} />
             <Route path="/areas-afetadas" element={<AffectedAreasPage />} />
             <Route path="/assistente" element={<AssistantPage />} />
           </Route>
