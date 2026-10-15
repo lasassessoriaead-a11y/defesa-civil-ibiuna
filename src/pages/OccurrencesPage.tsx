@@ -87,7 +87,10 @@ import {
   fetchViaCep,
   forwardGeocode,
   getCurrentPositionWithAccuracy,
+  GeolocationServiceError,
+  type GeolocationErrorKind,
 } from '@/services/geocoding'
+import { GpsTroubleshootModal } from '@/components/defesa-civil/GpsTroubleshootModal'
 import { OccurrencePrintView } from '@/components/defesa-civil/OccurrencePrintView'
 import type {
   Occurrence,
@@ -173,6 +176,9 @@ export const OccurrencesPage: React.FC = () => {
   const [isGeocoding, setIsGeocoding] = useState(false)
   const [isCapturingGps, setIsCapturingGps] = useState(false)
   const [gpsWarning, setGpsWarning] = useState<string | null>(null)
+  const [gpsErrorKind, setGpsErrorKind] = useState<GeolocationErrorKind>('PERMISSION_DENIED')
+  const [isGpsIframe, setIsGpsIframe] = useState(false)
+  const [isGpsHelpOpen, setIsGpsHelpOpen] = useState(false)
 
   // Centro visual inicial padrão para o mapa interativo (NÃO preenche campos nem banco)
   const [mapCenter, setMapCenter] = useState<[number, number]>([-23.6572, -47.2214]) // Sede Ibiúna / SP como padrão visual
@@ -428,12 +434,44 @@ export const OccurrencesPage: React.FC = () => {
       setFormData(updatedData)
       saveDraft(updatedData)
     } catch (err: any) {
+      const isGeoServiceErr = err instanceof GeolocationServiceError
+      const kind: GeolocationErrorKind = isGeoServiceErr ? err.kind : 'UNKNOWN'
+      const inIframe = isGeoServiceErr ? err.isIframe : false
+
+      setGpsErrorKind(kind)
+      setIsGpsIframe(inIframe)
+
+      // Personalização de mensagem curta e não obstrutiva com ação de ajuda
+      let title = 'GPS indisponível'
+      let desc = err.message || 'Não foi possível capturar o sinal de localização.'
+
+      if (kind === 'PERMISSION_DENIED' || kind === 'IFRAME_RESTRICTION') {
+        title = inIframe ? 'GPS bloqueado no preview' : 'Permissão de GPS negada'
+        desc = inIframe
+          ? 'O preview do Skip restringe o GPS. No link direto ou liberando a permissão, o GPS funcionará.'
+          : 'Ative a localização no cadeado da barra de endereço ou toque em "Como Ativar".'
+      } else if (kind === 'TIMEOUT') {
+        title = 'Tempo limite de GPS'
+        desc = 'Satélites demoraram a responder. Aponte no mapa ou tente novamente a céu aberto.'
+      } else if (kind === 'POSITION_UNAVAILABLE') {
+        title = 'Sinal de satélite indisponível'
+        desc = 'Verifique se a opção Localização está ativa na barra de notificações do celular.'
+      }
+
       toast({
         variant: 'destructive',
-        title: 'Falha ao obter GPS',
-        description:
-          err.message ||
-          'Não foi possível acessar a localização do dispositivo. Verifique a permissão do navegador ou selecione no mapa.',
+        title,
+        description: desc,
+        action: (
+          <Button
+            size="sm"
+            variant="outline"
+            className="bg-white/10 text-white border-white/20 hover:bg-white/20 text-xs shrink-0"
+            onClick={() => setIsGpsHelpOpen(true)}
+          >
+            Como Ativar
+          </Button>
+        ),
       })
     } finally {
       setIsCapturingGps(false)
@@ -1840,14 +1878,42 @@ export const OccurrencesPage: React.FC = () => {
                       Limpar Coords
                     </Button>
                   )}
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setGpsErrorKind('PERMISSION_DENIED')
+                      setIsGpsHelpOpen(true)
+                    }}
+                    className="h-8 text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 px-2"
+                    title="Ajuda sobre como habilitar GPS e permissões no celular"
+                  >
+                    <HelpCircle className="w-3.5 h-3.5" />
+                  </Button>
                 </div>
               </div>
 
               {/* Aviso de precisão aproximada se houver */}
               {gpsWarning && (
-                <div className="p-2.5 bg-amber-50 border border-amber-300 rounded text-amber-800 text-[11px] flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>{gpsWarning}</span>
+                <div className="p-2.5 bg-amber-50 border border-amber-300 rounded text-amber-800 text-[11px] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                    <span>{gpsWarning}</span>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      setGpsErrorKind('TIMEOUT')
+                      setIsGpsHelpOpen(true)
+                    }}
+                    className="h-6 text-[10px] text-amber-900 underline px-1 shrink-0"
+                  >
+                    Ver Dicas
+                  </Button>
                 </div>
               )}
 
@@ -2319,6 +2385,22 @@ export const OccurrencesPage: React.FC = () => {
         files={currentFiles}
         isOpen={isPrintModalOpen}
         onClose={() => setIsPrintModalOpen(false)}
+      />
+
+      {/* Modal de Ajuda e Desbloqueio Passo a Passo de GPS */}
+      <GpsTroubleshootModal
+        open={isGpsHelpOpen}
+        onOpenChange={setIsGpsHelpOpen}
+        errorKind={gpsErrorKind}
+        isIframe={isGpsIframe}
+        onRetry={handleUseCurrentLocation}
+        onUseMapAlternative={() => {
+          toast({
+            title: 'Modo Mapa Ativo',
+            description:
+              'Toque no mapa interativo abaixo para posicionar o marcador da ocorrência.',
+          })
+        }}
       />
     </div>
   )

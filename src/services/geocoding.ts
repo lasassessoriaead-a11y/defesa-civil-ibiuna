@@ -208,48 +208,273 @@ export async function forwardGeocode(
  * Captura GPS do dispositivo via API do navegador
  * Retorna coordenadas reais e precisão em metros
  */
-export function getCurrentPositionWithAccuracy(): Promise<{
+export type GeolocationErrorKind =
+  | 'PERMISSION_DENIED'
+  | 'POSITION_UNAVAILABLE'
+  | 'TIMEOUT'
+  | 'NOT_SUPPORTED'
+  | 'INSECURE_CONTEXT'
+  | 'IFRAME_RESTRICTION'
+  | 'UNKNOWN'
+
+export class GeolocationServiceError extends Error {
+  readonly kind: GeolocationErrorKind
+  readonly isIframe: boolean
+  readonly isStandalone: boolean
+  readonly rawCode?: number
+
+  constructor(
+    message: string,
+    kind: GeolocationErrorKind,
+    options?: { isIframe?: boolean; isStandalone?: boolean; rawCode?: number },
+  ) {
+    super(message)
+    this.name = 'GeolocationServiceError'
+    this.kind = kind
+    this.isIframe = options?.isIframe ?? false
+    this.isStandalone = options?.isStandalone ?? false
+    this.rawCode = options?.rawCode
+  }
+}
+
+/**
+ * Detecta se a página atual está renderizada dentro de um iframe
+ */
+export function isRunningInIframe(): boolean {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.self !== window.top
+  } catch {
+    return true
+  }
+}
+
+/**
+ * Detecta se a aplicação está aberta em modo PWA standalone (instalado)
+ */
+export function isRunningStandalone(): boolean {
+  if (typeof window === 'undefined') return false
+  const nav = window.navigator as any
+  const isMatch = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches
+  const isIosStandalone = !!nav?.standalone
+  return Boolean(isMatch || isIosStandalone)
+}
+
+/**
+ * Consulta o status da permissão de geolocalização se o navegador suportar navigator.permissions
+ */
+export async function checkGeolocationPermission(): Promise<
+  'granted' | 'prompt' | 'denied' | 'unsupported'
+> {
+  if (typeof navigator === 'undefined' || !navigator.permissions || !navigator.permissions.query) {
+    return 'unsupported'
+  }
+  try {
+    const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName })
+    return status.state
+  } catch {
+    return 'unsupported'
+  }
+}
+
+/**
+ * Helper interno que tenta obter posição com estratégia de watchPosition ou getCurrentPosition
+ */
+function attemptPosition(options: PositionOptions): Promise<{
   latitude: number
   longitude: number
   accuracy: number
+  altitude?: number | null
+  speed?: number | null
+  heading?: number | null
+  timestamp: number
 }> {
   return new Promise((resolve, reject) => {
     if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      reject(new Error('Geolocalização não suportada neste navegador ou dispositivo.'))
+      reject(new Error('GEOLOCATION_UNSUPPORTED'))
       return
     }
 
-    const options: PositionOptions = {
-      enableHighAccuracy: true,
-      timeout: 12000,
-      maximumAge: 5000,
+    let isSettled = false
+    let watchId: number | null = null
+
+    // Timeout de segurança manual para browsers que não disparam erro em opções nativas
+    const timeoutTimer = setTimeout(
+      () => {
+        if (isSettled) return
+        isSettled = true
+        if (watchId !== null) {
+          try {
+            navigator.geolocation.clearWatch(watchId)
+          } catch {
+            /* ignore */
+          }
+        }
+        const timeoutErr: any = new Error('Tempo limite esgotado ao buscar posição GPS.')
+        timeoutErr.code = 3 // TIMEOUT
+        reject(timeoutErr)
+      },
+      (options.timeout || 12000) + 1500,
+    )
+
+    const handleSuccess = (pos: GeolocationPosition) => {
+      if (isSettled) return
+      isSettled = true
+      clearTimeout(timeoutTimer)
+      if (watchId !== null) {
+        try {
+          navigator.geolocation.clearWatch(watchId)
+        } catch {
+          /* ignore */
+        }
+      }
+      resolve({
+        latitude: pos.coords.latitude,
+        longitude: pos.coords.longitude,
+        accuracy: Math.round(pos.coords.accuracy || 0),
+        altitude: pos.coords.altitude,
+        speed: pos.coords.speed,
+        heading: pos.coords.heading,
+        timestamp: pos.timestamp,
+      })
     }
 
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        resolve({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: Math.round(pos.coords.accuracy || 0),
-        })
-      },
-      (err) => {
-        let msg = 'Erro ao obter localização do dispositivo.'
-        switch (err.code) {
-          case err.PERMISSION_DENIED:
-            msg =
-              'Permissão de localização negada pelo usuário. Ative a permissão de GPS no navegador/sistema.'
-            break
-          case err.POSITION_UNAVAILABLE:
-            msg = 'Sinal de GPS/localização indisponível no momento.'
-            break
-          case err.TIMEOUT:
-            msg = 'Tempo limite esgotado ao tentar obter o sinal de GPS.'
-            break
+    const handleError = (err: GeolocationPositionError) => {
+      if (isSettled) return
+      isSettled = true
+      clearTimeout(timeoutTimer)
+      if (watchId !== null) {
+        try {
+          navigator.geolocation.clearWatch(watchId)
+        } catch {
+          /* ignore */
         }
-        reject(new Error(msg))
-      },
-      options,
-    )
+      }
+      reject(err)
+    }
+
+    // No Android Chrome móvel, watchPosition acorda o hardware do GPS com muito mais confiabilidade
+    // do que getCurrentPosition estático quando a antena está adormecida.
+    try {
+      watchId = navigator.geolocation.watchPosition(handleSuccess, handleError, options)
+    } catch {
+      // Fallback clássico caso watchPosition falhe de imediato por contexto restrito
+      navigator.geolocation.getCurrentPosition(handleSuccess, handleError, options)
+    }
   })
+}
+
+/**
+ * Captura GPS do dispositivo via API do navegador com resiliência a mobile e redes de campo.
+ * Estratégia de 3 estágios:
+ * 1. Alta precisão (GPS real por satélite/hardware) - 10s
+ * 2. Fallback de precisão balanceada (torres celulares/Wi-Fi/cache rápido) - 8s
+ * 3. Fallback de cache recente (maximumAge: 60s) para ambientes com sinal intermitente
+ * Retorna coordenadas reais e precisão em metros.
+ */
+export async function getCurrentPositionWithAccuracy(): Promise<{
+  latitude: number
+  longitude: number
+  accuracy: number
+  altitude?: number | null
+  speed?: number | null
+  heading?: number | null
+  timestamp?: number
+  isApproximate?: boolean
+}> {
+  const isIframe = isRunningInIframe()
+  const isStandalone = isRunningStandalone()
+
+  if (typeof window !== 'undefined' && !window.isSecureContext) {
+    throw new GeolocationServiceError(
+      'A geolocalização do navegador requer conexão segura (HTTPS). Acesse via HTTPS para utilizar o GPS.',
+      'INSECURE_CONTEXT',
+      { isIframe, isStandalone },
+    )
+  }
+
+  if (typeof navigator === 'undefined' || !navigator.geolocation) {
+    throw new GeolocationServiceError(
+      'Geolocalização não suportada neste navegador ou dispositivo.',
+      'NOT_SUPPORTED',
+      { isIframe, isStandalone },
+    )
+  }
+
+  // Estágio 1: Alta precisão (satélite GPS puro)
+  try {
+    const pos = await attemptPosition({
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 5000,
+    })
+    return { ...pos, isApproximate: pos.accuracy > 80 }
+  } catch (firstErr: any) {
+    // Se foi permissão negada, não adianta tentar outro estágio: o usuário/navegador barrou
+    if (firstErr?.code === 1 || firstErr?.name === 'NotAllowedError') {
+      const msg = isIframe
+        ? 'Permissão de localização bloqueada no quadro (preview). Se estiver no preview, abra o sistema na URL direta ou autorize a localização.'
+        : 'Permissão de localização negada. Toque no ícone de opções do navegador para autorizar o acesso ao GPS.'
+      throw new GeolocationServiceError(
+        msg,
+        isIframe ? 'IFRAME_RESTRICTION' : 'PERMISSION_DENIED',
+        {
+          isIframe,
+          isStandalone,
+          rawCode: 1,
+        },
+      )
+    }
+
+    // Estágio 2: Fallback para precisão balanceada (torre de celular/rede, útil em áreas com obstrução de satélite)
+    try {
+      const pos2 = await attemptPosition({
+        enableHighAccuracy: false,
+        timeout: 9000,
+        maximumAge: 20000,
+      })
+      return { ...pos2, isApproximate: true }
+    } catch (secondErr: any) {
+      if (secondErr?.code === 1 || secondErr?.name === 'NotAllowedError') {
+        throw new GeolocationServiceError('Permissão de localização negada.', 'PERMISSION_DENIED', {
+          isIframe,
+          isStandalone,
+          rawCode: 1,
+        })
+      }
+
+      // Estágio 3: Última tentativa usando cache de localização do aparelho de até 2 minutos
+      try {
+        const pos3 = await attemptPosition({
+          enableHighAccuracy: false,
+          timeout: 4000,
+          maximumAge: 120000,
+        })
+        return { ...pos3, isApproximate: true }
+      } catch (finalErr: any) {
+        const code = finalErr?.code || firstErr?.code
+        let kind: GeolocationErrorKind = 'UNKNOWN'
+        let msg = 'Erro ao obter localização do dispositivo.'
+
+        if (code === 1 || finalErr?.name === 'NotAllowedError') {
+          kind = 'PERMISSION_DENIED'
+          msg = 'Permissão de localização negada pelo usuário.'
+        } else if (code === 2) {
+          kind = 'POSITION_UNAVAILABLE'
+          msg =
+            'Sinal de GPS indisponível no momento. Certifique-se de que a localização do celular está ligada no menu de configurações do aparelho.'
+        } else if (code === 3) {
+          kind = 'TIMEOUT'
+          msg =
+            'Tempo esgotado ao buscar sinal de satélite. Mova-se para um local com visão livre do céu ou utilize o mapa interativo.'
+        }
+
+        throw new GeolocationServiceError(msg, kind, {
+          isIframe,
+          isStandalone,
+          rawCode: code,
+        })
+      }
+    }
+  }
 }
