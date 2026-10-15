@@ -116,6 +116,8 @@ export type OccurrenceOrigin =
   | 'processo_administrativo'
   | 'outro'
 
+export type LocationOrigin = 'gps' | 'mapa' | 'manual' | 'cep' | 'geocoding' | 'importacao'
+
 export interface Occurrence extends RecordModel {
   code?: string
   title: string
@@ -129,6 +131,18 @@ export interface Occurrence extends RecordModel {
   latitude?: number
   longitude?: number
   address?: string
+  // Detalhamento de endereço e geolocalização auditável
+  street?: string
+  number?: string
+  neighborhood?: string
+  city?: string
+  state?: string
+  postal_code?: string
+  complement?: string
+  reference_point?: string
+  location_origin?: LocationOrigin
+  location_accuracy?: number
+  address_confirmed?: boolean
   affectable_population?: number
   reported_by?: string
   resolved_at?: string

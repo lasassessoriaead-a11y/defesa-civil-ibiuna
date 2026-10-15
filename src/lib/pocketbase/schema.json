@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-15T17:02:14.244Z",
+  "generatedAt": "2026-10-15T17:24:09.417Z",
   "collections": [
     {
       "name": "users",
@@ -213,6 +213,73 @@
           "required": false,
           "system": false,
           "selectValues": ["synced", "pending"]
+        },
+        {
+          "name": "street",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "neighborhood",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "postal_code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "complement",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "reference_point",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "location_origin",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["gps", "mapa", "manual", "cep", "geocoding", "importacao"]
+        },
+        {
+          "name": "location_accuracy",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address_confirmed",
+          "type": "bool",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

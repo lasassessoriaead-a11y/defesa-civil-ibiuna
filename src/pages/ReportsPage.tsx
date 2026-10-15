@@ -248,19 +248,24 @@ export const ReportsPage: React.FC = () => {
               filteredOccurrences.length === 0
                 ? '<tr><td colspan="7" style="text-align: center; padding: 20px;">Nenhuma ocorrência encontrada.</td></tr>'
                 : filteredOccurrences
-                    .map(
-                      (o) => `
+                    .map((o) => {
+                      const locText =
+                        o.address ||
+                        (o.latitude && o.longitude
+                          ? `${o.latitude.toFixed(4)}, ${o.longitude.toFixed(4)} (Endereço não identificado)`
+                          : '-')
+                      return `
                 <tr style="border-bottom: 1px solid #ddd;">
                   <td style="padding: 6px; font-weight: bold; font-family: monospace;">${o.code || o.id}</td>
                   <td style="padding: 6px;"><strong>${o.title}</strong><br/><span style="color: #666;">${TYPE_LABELS[o.type] || o.type}</span></td>
                   <td style="padding: 6px;">${SEVERITY_LABELS[o.severity] || o.severity}</td>
                   <td style="padding: 6px;">${STATUS_LABELS[o.status] || o.status}</td>
                   <td style="padding: 6px;">${ORIGIN_LABELS[o.origin || '199'] || o.origin}</td>
-                  <td style="padding: 6px;">${o.address || '-'}</td>
+                  <td style="padding: 6px;">${locText}</td>
                   <td style="padding: 6px;">${new Date(o.created).toLocaleDateString('pt-BR')}</td>
                 </tr>
-              `,
-                    )
+              `
+                    })
                     .join('')
             }
           </tbody>
@@ -785,7 +790,10 @@ export const ReportsPage: React.FC = () => {
                           {ORIGIN_LABELS[occ.origin || '199'] || occ.origin}
                         </td>
                         <td className="p-3 text-slate-600 max-w-xs truncate">
-                          {occ.address || '-'}
+                          {occ.address ||
+                            (occ.latitude && occ.longitude
+                              ? `${occ.latitude.toFixed(4)}, ${occ.longitude.toFixed(4)}`
+                              : '-')}
                         </td>
                         <td className="p-3 text-slate-500">
                           {new Date(occ.created).toLocaleDateString('pt-BR')}

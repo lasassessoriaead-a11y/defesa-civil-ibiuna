@@ -53,14 +53,22 @@ export const STATUS_LABELS: Record<OccurrenceStatus, string> = {
 }
 
 export const ORIGIN_LABELS: Record<string, string> = {
-  '199': '199 (Emergência)',
-  denuncia: 'Denúncia Anônima',
-  telefone: 'Telefone / Chamada Direta',
-  redes_sociais: 'Redes Sociais',
+  '199': 'Disque 199 (Emergência)',
+  denuncia: 'Denúncia Presencial / Anônima',
+  telefone: 'Telefone Institucional',
+  redes_sociais: 'Redes Sociais / Monitoramento',
   processo_administrativo: 'Processo Administrativo',
   outro: 'Outro Canal',
 }
 
+export const LOCATION_ORIGIN_LABELS: Record<string, string> = {
+  gps: 'GPS do Dispositivo',
+  mapa: 'Seleção Manual no Mapa',
+  manual: 'Endereço Digitado Manualmente',
+  cep: 'Consulta por CEP (ViaCEP)',
+  geocoding: 'Geocodificação Direta',
+  importacao: 'Importação / Migração',
+}
 export const ALERT_SEVERITY_LABELS: Record<AlertSeverity, string> = {
   informativo: 'Informativo',
   alerta: 'Alerta',

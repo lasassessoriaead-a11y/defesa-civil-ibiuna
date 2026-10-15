@@ -132,6 +132,10 @@ onRecordCreate((e) => {
       status: record.getString('status'),
       origin: record.getString('origin'),
       address: record.getString('address'),
+      street: record.getString('street'),
+      neighborhood: record.getString('neighborhood'),
+      city: record.getString('city'),
+      location_origin: record.getString('location_origin'),
     }
     auditRec.set('data_after', JSON.stringify(safeAfter))
     $app.save(auditRec)
@@ -183,6 +187,10 @@ onRecordUpdate((e) => {
     status: oldStatus,
     origin: original.getString('origin'),
     address: original.getString('address'),
+    street: original.getString('street'),
+    neighborhood: original.getString('neighborhood'),
+    city: original.getString('city'),
+    location_origin: original.getString('location_origin'),
   }
 
   e.next()
@@ -213,6 +221,10 @@ onRecordUpdate((e) => {
       status: newStatus,
       origin: record.getString('origin'),
       address: record.getString('address'),
+      street: record.getString('street'),
+      neighborhood: record.getString('neighborhood'),
+      city: record.getString('city'),
+      location_origin: record.getString('location_origin'),
     }
 
     const auditCol = $app.findCollectionByNameOrId('audit_log')
