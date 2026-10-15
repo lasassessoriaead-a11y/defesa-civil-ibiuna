@@ -49,7 +49,9 @@ export const UsersManagementPage: React.FC = () => {
 
   const [users, setUsers] = useState<User[]>([])
   const [municipalities, setMunicipalities] = useState<Municipality[]>([])
+  const [currentMunicipality, setCurrentMunicipality] = useState<Municipality | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isUpdatingIssuer, setIsUpdatingIssuer] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
 
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
@@ -71,6 +73,10 @@ export const UsersManagementPage: React.FC = () => {
       ])
       setUsers(usersList)
       setMunicipalities(munsList)
+      if (currentUser?.municipality) {
+        const currentMun = munsList.find((m) => m.id === currentUser.municipality)
+        if (currentMun) setCurrentMunicipality(currentMun)
+      }
     } catch (err) {
       toast({
         variant: 'destructive',
@@ -157,6 +163,69 @@ export const UsersManagementPage: React.FC = () => {
           município.
         </p>
       </div>
+
+      {/* Bloco de Designação de Emissor de Autorizações (Corte e Poda) */}
+      {(currentUser?.role === 'administrador' || currentUser?.role === 'coordenador') &&
+        currentMunicipality && (
+          <Card className="border-emerald-200 bg-emerald-50/60 shadow-xs">
+            <CardContent className="p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+              <div>
+                <div className="flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-emerald-700" />
+                  <h3 className="text-sm font-bold text-emerald-950">
+                    Emissor Oficial de Autorizações de Corte e Poda
+                  </h3>
+                </div>
+                <p className="text-xs text-emerald-800 mt-1 max-w-xl">
+                  Apenas 1 usuário por município pode ser formalmente designado para assinar e
+                  emitir autorizações de intervenção arbórea. Essa trava é fiscalizada pelo backend.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-2 w-full md:w-auto">
+                <Select
+                  value={currentMunicipality.authorized_issuer || 'none'}
+                  onValueChange={async (val) => {
+                    try {
+                      setIsUpdatingIssuer(true)
+                      const newIssuerId = val === 'none' ? '' : val
+                      const updated = await municipalitiesService.update(currentMunicipality.id, {
+                        authorized_issuer: newIssuerId,
+                      })
+                      setCurrentMunicipality(updated)
+                      toast({
+                        title: 'Emissor designado atualizado!',
+                        description:
+                          'A designação oficial foi salva e já está em vigor no backend.',
+                      })
+                    } catch (err) {
+                      toast({
+                        variant: 'destructive',
+                        title: 'Erro ao atualizar emissor',
+                        description: getErrorMessage(err),
+                      })
+                    } finally {
+                      setIsUpdatingIssuer(false)
+                    }
+                  }}
+                  disabled={isUpdatingIssuer}
+                >
+                  <SelectTrigger className="w-full md:w-64 bg-white border-emerald-300 text-xs">
+                    <SelectValue placeholder="Selecione o emissor..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum designado (Padrão Admin/Coord)</SelectItem>
+                    {users.map((u) => (
+                      <SelectItem key={u.id} value={u.id}>
+                        {u.name || u.email} ({u.role})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
       {/* Filter Bar */}
       <Card className="border-slate-200 bg-white shadow-xs">

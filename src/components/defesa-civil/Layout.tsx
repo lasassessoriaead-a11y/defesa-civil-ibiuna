@@ -22,6 +22,9 @@ import {
   Shield,
   PhoneCall,
   UserCheck,
+  FileText,
+  TreeDeciduous,
+  FileSpreadsheet,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,6 +52,9 @@ interface NavItem {
 const navItems: NavItem[] = [
   { title: 'Painel de Monitoramento', href: '/painel', icon: LayoutDashboard },
   { title: 'Ocorrências', href: '/ocorrencias', icon: AlertTriangle },
+  { title: 'Ofícios', href: '/oficios', icon: FileText },
+  { title: 'Autorizações (Poda/Corte)', href: '/autorizacoes', icon: TreeDeciduous },
+  { title: 'Relatórios & PDF', href: '/relatorios', icon: FileSpreadsheet },
   { title: 'Abrigos', href: '/abrigos', icon: Building2 },
   { title: 'Equipes', href: '/equipes', icon: Users },
   { title: 'Suprimentos', href: '/suprimentos', icon: Package },

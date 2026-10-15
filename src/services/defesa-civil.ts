@@ -14,6 +14,10 @@ import type {
   OccurrenceFile,
   AuditLogEntry,
   User,
+  DocTemplate,
+  OfficialDocument,
+  TreeAuthorization,
+  DocumentReviewAiResult,
 } from '@/types/defesa-civil'
 
 // Helper to normalize PB errors
@@ -40,6 +44,105 @@ export const municipalitiesService = {
   },
   async update(id: string, data: Partial<Municipality>) {
     return pb.collection('municipalities').update<Municipality>(id, data)
+  },
+  getLogoUrl(record: Municipality, filename?: string) {
+    if (!filename && record.logo) filename = record.logo
+    if (!filename) return ''
+    return pb.files.getURL(record, filename)
+  },
+}
+
+// Templates de Documentos Oficiais
+export const docTemplatesService = {
+  async list(filter?: string, sort = 'title') {
+    return pb.collection('doc_templates').getFullList<DocTemplate>({
+      filter,
+      sort,
+      expand: 'created_by',
+      requestKey: null,
+    })
+  },
+  async get(id: string) {
+    return pb.collection('doc_templates').getOne<DocTemplate>(id, {
+      expand: 'created_by',
+      requestKey: null,
+    })
+  },
+  async create(data: Partial<DocTemplate>) {
+    return pb.collection('doc_templates').create<DocTemplate>(data)
+  },
+  async update(id: string, data: Partial<DocTemplate>) {
+    return pb.collection('doc_templates').update<DocTemplate>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('doc_templates').delete(id)
+  },
+}
+
+// Official Documents (Ofícios)
+export const officialDocumentsService = {
+  async list(filter?: string, sort = '-created') {
+    return pb.collection('official_documents').getFullList<OfficialDocument>({
+      filter,
+      sort,
+      expand: 'municipality,template,signatory_user,created_by',
+      requestKey: null,
+    })
+  },
+  async get(id: string) {
+    return pb.collection('official_documents').getOne<OfficialDocument>(id, {
+      expand: 'municipality,template,signatory_user,created_by',
+      requestKey: null,
+    })
+  },
+  async create(data: Partial<OfficialDocument>) {
+    return pb.collection('official_documents').create<OfficialDocument>(data)
+  },
+  async update(id: string, data: Partial<OfficialDocument>) {
+    return pb.collection('official_documents').update<OfficialDocument>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('official_documents').delete(id)
+  },
+  async reviewWithAi(
+    text: string,
+    mode: 'revisao' | 'formal' | 'aprimoramento' = 'revisao',
+  ): Promise<DocumentReviewAiResult> {
+    const res = await pb.send('/backend/v1/documents/review-ai', {
+      method: 'POST',
+      body: JSON.stringify({ text, mode }),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    return res as DocumentReviewAiResult
+  },
+}
+
+// Tree Authorizations (Autorizações de Corte e Poda)
+export const treeAuthorizationsService = {
+  async list(filter?: string, sort = '-created') {
+    return pb.collection('tree_authorizations').getFullList<TreeAuthorization>({
+      filter,
+      sort,
+      expand: 'municipality,requester,authorized_by,created_by',
+      requestKey: null,
+    })
+  },
+  async get(id: string) {
+    return pb.collection('tree_authorizations').getOne<TreeAuthorization>(id, {
+      expand: 'municipality,requester,authorized_by,created_by',
+      requestKey: null,
+    })
+  },
+  async create(data: Partial<TreeAuthorization>) {
+    return pb.collection('tree_authorizations').create<TreeAuthorization>(data)
+  },
+  async update(id: string, data: Partial<TreeAuthorization>) {
+    return pb.collection('tree_authorizations').update<TreeAuthorization>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('tree_authorizations').delete(id)
   },
 }
 

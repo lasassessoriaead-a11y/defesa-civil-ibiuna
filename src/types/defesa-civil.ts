@@ -10,6 +10,89 @@ export interface Municipality extends RecordModel {
   doc_header?: string
   doc_footer?: string
   settings?: Record<string, unknown>
+  authorized_issuer?: string
+  expand?: {
+    authorized_issuer?: User
+  }
+}
+
+export type DocumentStatus = 'rascunho' | 'emitido' | 'cancelado'
+
+export interface DocTemplate extends RecordModel {
+  municipality: string
+  title: string
+  category: 'oficio' | 'notificacao' | 'solicitacao' | 'laudo' | 'outro'
+  subject?: string
+  content?: string
+  is_default?: boolean
+  created_by?: string
+  expand?: {
+    created_by?: User
+  }
+}
+
+export interface OfficialDocument extends RecordModel {
+  municipality: string
+  number?: string // OF-2026-00001
+  year?: number
+  sequential?: number
+  status: DocumentStatus
+  recipient_name: string
+  recipient_role?: string
+  recipient_institution?: string
+  recipient_address?: string
+  subject: string
+  content: string
+  signatory_user?: string
+  signatory_name?: string
+  signatory_role?: string
+  issue_date?: string
+  template?: string
+  created_by?: string
+  expand?: {
+    municipality?: Municipality
+    template?: DocTemplate
+    signatory_user?: User
+    created_by?: User
+  }
+}
+
+export type TreeAuthType = 'corte' | 'poda' | 'corte_e_poda'
+export type TreeAuthStatus = 'rascunho' | 'emitida' | 'cancelada'
+
+export interface TreeAuthorization extends RecordModel {
+  municipality: string
+  number?: string // AUT-2026-00001
+  year?: number
+  sequential?: number
+  status: TreeAuthStatus
+  type: TreeAuthType
+  requester: string
+  tree_quantity: number
+  tree_species?: string
+  address: string
+  neighborhood?: string
+  risk_reason?: string
+  technical_report: string
+  compensatory_measures?: string
+  issue_date?: string
+  expiration_date?: string // 90 dias a partir da emissão
+  authorized_by?: string
+  authorized_by_name?: string
+  authorized_by_role?: string
+  created_by?: string
+  expand?: {
+    municipality?: Municipality
+    requester?: Requester
+    authorized_by?: User
+    created_by?: User
+  }
+}
+
+export interface DocumentReviewAiResult {
+  improved_text: string
+  summary_of_changes: string
+  tone: string
 }
 
 export type OccurrenceType =

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-15T16:16:24.634Z",
+  "generatedAt": "2026-10-15T16:42:15.176Z",
   "collections": [
     {
       "name": "users",
@@ -881,6 +881,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "authorized_issuer",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
         }
       ],
       "indexes": [
@@ -1194,6 +1201,436 @@
         "CREATE INDEX idx_audit_mun_created ON audit_log (municipality, created DESC)",
         "CREATE INDEX idx_audit_action ON audit_log (action)",
         "CREATE INDEX idx_audit_record ON audit_log (collection, record_id)"
+      ]
+    },
+    {
+      "name": "document_counters",
+      "type": "base",
+      "apiRules": {
+        "list": null,
+        "view": null,
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["oficio", "autorizacao"]
+        },
+        {
+          "name": "year",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "last_number",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_doc_counter_mun_type_year ON document_counters (municipality, type, year)"
+      ]
+    },
+    {
+      "name": "doc_templates",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "category",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["oficio", "notificacao", "solicitacao", "laudo", "outro"]
+        },
+        {
+          "name": "subject",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "content",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_default",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_templates_mun ON doc_templates (municipality)",
+        "CREATE INDEX idx_templates_cat ON doc_templates (category)"
+      ]
+    },
+    {
+      "name": "official_documents",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality && (status = 'rascunho' || (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador'))",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && status = 'rascunho' && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "year",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sequential",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["rascunho", "emitido", "cancelado"]
+        },
+        {
+          "name": "recipient_name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "recipient_role",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "recipient_institution",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "recipient_address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "subject",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "content",
+          "type": "editor",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "signatory_user",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "signatory_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "signatory_role",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "issue_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "template",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "doc_templates"
+        },
+        {
+          "name": "created_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_doc_num_mun ON official_documents (municipality, number) WHERE number != \"\"",
+        "CREATE INDEX idx_doc_mun_status ON official_documents (municipality, status)",
+        "CREATE INDEX idx_doc_created ON official_documents (created DESC)"
+      ]
+    },
+    {
+      "name": "tree_authorizations",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality && (status = 'rascunho' || (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador'))",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && status = 'rascunho' && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "year",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sequential",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["rascunho", "emitida", "cancelada"]
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["corte", "poda", "corte_e_poda"]
+        },
+        {
+          "name": "requester",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "requesters"
+        },
+        {
+          "name": "tree_quantity",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "tree_species",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "neighborhood",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "risk_reason",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "technical_report",
+          "type": "editor",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "compensatory_measures",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "issue_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "expiration_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "authorized_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "authorized_by_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "authorized_by_role",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_tree_auth_num_mun ON tree_authorizations (municipality, number) WHERE number != \"\"",
+        "CREATE INDEX idx_tree_auth_mun_status ON tree_authorizations (municipality, status)",
+        "CREATE INDEX idx_tree_auth_req ON tree_authorizations (requester)",
+        "CREATE INDEX idx_tree_auth_exp ON tree_authorizations (expiration_date)"
       ]
     }
   ]

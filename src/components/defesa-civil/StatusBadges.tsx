@@ -237,3 +237,32 @@ export const ShelterStatusBadge: React.FC<{ status: ShelterStatus }> = ({ status
       return <Badge className="bg-slate-400 text-white">Inativo</Badge>
   }
 }
+
+export const DocumentStatusBadge: React.FC<{ status: string }> = ({ status }) => {
+  switch (status) {
+    case 'emitido':
+    case 'emitida':
+      return (
+        <Badge className="bg-emerald-600 hover:bg-emerald-700 text-white font-medium">
+          <CheckCircle2 className="w-3 h-3 mr-1" /> Emitido Oficial
+        </Badge>
+      )
+    case 'cancelado':
+    case 'cancelada':
+      return (
+        <Badge variant="outline" className="border-red-300 bg-red-50 text-red-700">
+          Cancelado
+        </Badge>
+      )
+    case 'rascunho':
+    default:
+      return (
+        <Badge
+          variant="outline"
+          className="border-amber-400 bg-amber-50 text-amber-700 font-medium"
+        >
+          <Clock className="w-3 h-3 mr-1" /> Rascunho
+        </Badge>
+      )
+  }
+}
