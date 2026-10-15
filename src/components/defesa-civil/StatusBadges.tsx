@@ -52,6 +52,15 @@ export const STATUS_LABELS: Record<OccurrenceStatus, string> = {
   cancelada: 'Cancelada',
 }
 
+export const ORIGIN_LABELS: Record<string, string> = {
+  '199': '199 (Emergência)',
+  denuncia: 'Denúncia Anônima',
+  telefone: 'Telefone / Chamada Direta',
+  redes_sociais: 'Redes Sociais',
+  processo_administrativo: 'Processo Administrativo',
+  outro: 'Outro Canal',
+}
+
 export const ALERT_SEVERITY_LABELS: Record<AlertSeverity, string> = {
   informativo: 'Informativo',
   alerta: 'Alerta',

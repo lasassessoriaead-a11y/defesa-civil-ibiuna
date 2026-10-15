@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useRef } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   Plus,
@@ -19,6 +19,14 @@ import {
   ChevronRight,
   Sparkles,
   Loader2,
+  Camera,
+  Paperclip,
+  FileText,
+  Image as ImageIcon,
+  Building,
+  Phone,
+  Hash,
+  Download,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,7 +55,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { InteractiveMap } from '@/components/defesa-civil/InteractiveMap'
 import {
@@ -57,11 +65,14 @@ import {
   TYPE_LABELS,
   SEVERITY_LABELS,
   STATUS_LABELS,
+  ORIGIN_LABELS,
 } from '@/components/defesa-civil/StatusBadges'
 import {
   occurrencesService,
   teamsService,
   alertsService,
+  requestersService,
+  occurrenceFilesService,
   getErrorMessage,
 } from '@/services/defesa-civil'
 import type {
@@ -69,8 +80,11 @@ import type {
   OccurrenceType,
   OccurrenceSeverity,
   OccurrenceStatus,
+  OccurrenceOrigin,
   Team,
   Alert,
+  Requester,
+  OccurrenceFile,
 } from '@/types/defesa-civil'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useAuth } from '@/contexts/AuthContext'
@@ -85,6 +99,7 @@ export const OccurrencesPage: React.FC = () => {
   const [occurrences, setOccurrences] = useState<Occurrence[]>([])
   const [teams, setTeams] = useState<Team[]>([])
   const [alerts, setAlerts] = useState<Alert[]>([])
+  const [requesters, setRequesters] = useState<Requester[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   // Filters
@@ -92,6 +107,7 @@ export const OccurrencesPage: React.FC = () => {
   const [selectedType, setSelectedType] = useState<string>('all')
   const [selectedSeverity, setSelectedSeverity] = useState<string>('all')
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
+  const [selectedOrigin, setSelectedOrigin] = useState<string>('all')
   const [currentPage, setCurrentPage] = useState(1)
   const itemsPerPage = 8
 
@@ -101,6 +117,13 @@ export const OccurrencesPage: React.FC = () => {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false)
   const [selectedOccurrence, setSelectedOccurrence] = useState<Occurrence | null>(null)
 
+  // Files of selected occurrence
+  const [currentFiles, setCurrentFiles] = useState<OccurrenceFile[]>([])
+  const [isLoadingFiles, setIsLoadingFiles] = useState(false)
+  const [isUploadingFile, setIsUploadingFile] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement | null>(null)
+
   // Form State
   const [formData, setFormData] = useState<Partial<Occurrence>>({
     title: '',
@@ -108,32 +131,47 @@ export const OccurrencesPage: React.FC = () => {
     type: 'enchente',
     severity: 'media',
     status: 'reportada',
+    origin: '199',
+    requester: '',
     latitude: -23.5505,
     longitude: -46.6333,
     address: '',
     affectable_population: 0,
   })
+  const [cepInput, setCepInput] = useState('')
+  const [isSearchingCep, setIsSearchingCep] = useState(false)
   const [isGeocoding, setIsGeocoding] = useState(false)
+
+  // Quick Requester Create inside Form
+  const [isQuickRequesterOpen, setIsQuickRequesterOpen] = useState(false)
+  const [quickReqData, setQuickReqData] = useState<Partial<Requester>>({
+    name: '',
+    type: 'pf',
+    document: '',
+    phone: '',
+    address: '',
+  })
 
   // Load Data
   const loadData = async () => {
     try {
-      const [occData, teamData, alertData] = await Promise.all([
+      const [occData, teamData, alertData, reqData] = await Promise.all([
         occurrencesService.list(),
         teamsService.list(),
         alertsService.list(),
+        requestersService.list(),
       ])
       setOccurrences(occData)
       setTeams(teamData)
       setAlerts(alertData)
+      setRequesters(reqData)
 
       // Handle deep-link
       const idParam = searchParams.get('id')
       if (idParam) {
         const found = occData.find((o) => o.id === idParam)
         if (found) {
-          setSelectedOccurrence(found)
-          setIsDetailOpen(true)
+          openDetailModal(found)
         }
       }
 
@@ -155,6 +193,25 @@ export const OccurrencesPage: React.FC = () => {
   useRealtime<Occurrence>('occurrences', () => loadData())
   useRealtime<Team>('teams', () => loadData())
   useRealtime<Alert>('alerts', () => loadData())
+  useRealtime<Requester>('requesters', () => loadData())
+
+  const loadOccurrenceFiles = async (occId: string) => {
+    try {
+      setIsLoadingFiles(true)
+      const files = await occurrenceFilesService.listForOccurrence(occId)
+      setCurrentFiles(files)
+    } catch {
+      // Ignora erro
+    } finally {
+      setIsLoadingFiles(false)
+    }
+  }
+
+  const openDetailModal = (occ: Occurrence) => {
+    setSelectedOccurrence(occ)
+    setIsDetailOpen(true)
+    loadOccurrenceFiles(occ.id)
+  }
 
   const openCreateForm = () => {
     setFormData({
@@ -163,12 +220,16 @@ export const OccurrencesPage: React.FC = () => {
       type: 'enchente',
       severity: 'alta',
       status: 'reportada',
+      origin: '199',
+      requester: '',
       latitude: -23.5505,
       longitude: -46.6333,
       address: '',
       affectable_population: 50,
       reported_by: user?.id,
+      municipality: user?.municipality,
     })
+    setCepInput('')
     setSelectedOccurrence(null)
     setIsFormOpen(true)
   }
@@ -178,9 +239,61 @@ export const OccurrencesPage: React.FC = () => {
     setFormData({
       ...occ,
     })
+    setCepInput('')
     setIsFormOpen(true)
   }
 
+  // ViaCEP integration
+  const handleSearchCep = async () => {
+    const cleanCep = cepInput.replace(/\D/g, '')
+    if (cleanCep.length !== 8) {
+      toast({
+        variant: 'destructive',
+        title: 'CEP Inválido',
+        description: 'Informe um CEP válido com 8 dígitos.',
+      })
+      return
+    }
+
+    setIsSearchingCep(true)
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`)
+      const data = await res.json()
+      if (data.erro) {
+        toast({ variant: 'destructive', title: 'CEP não encontrado no ViaCEP' })
+        return
+      }
+
+      const fullAddr = `${data.logradouro ? data.logradouro + ', ' : ''}${data.bairro ? data.bairro + ', ' : ''}${data.localidade} - ${data.uf}`
+      setFormData((prev) => ({ ...prev, address: fullAddr }))
+      toast({ title: 'Endereço localizado via CEP!', description: fullAddr })
+
+      // Geocodificar automaticamente o endereço obtido via ViaCEP
+      try {
+        const geoRes = await fetch(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddr)}&limit=1`,
+        )
+        const geoData = await geoRes.json()
+        if (Array.isArray(geoData) && geoData.length > 0) {
+          const lat = parseFloat(geoData[0].lat)
+          const lon = parseFloat(geoData[0].lon)
+          setFormData((prev) => ({ ...prev, latitude: lat, longitude: lon }))
+        }
+      } catch {
+        // Geocode opcional
+      }
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Falha na busca de CEP',
+        description: getErrorMessage(err),
+      })
+    } finally {
+      setIsSearchingCep(false)
+    }
+  }
+
+  // Nominatim Address Geocode
   const handleGeocode = async () => {
     const address = formData.address?.trim()
     if (!address) {
@@ -202,7 +315,7 @@ export const OccurrencesPage: React.FC = () => {
           description: `${lat.toFixed(5)}, ${lon.toFixed(5)}`,
         })
       } else {
-        toast({ variant: 'destructive', title: 'Endereço não encontrado' })
+        toast({ variant: 'destructive', title: 'Endereço não encontrado no mapa' })
       }
     } catch (err) {
       toast({
@@ -215,6 +328,7 @@ export const OccurrencesPage: React.FC = () => {
     }
   }
 
+  // Save Occurrence
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!formData.title?.trim()) {
@@ -236,8 +350,12 @@ export const OccurrencesPage: React.FC = () => {
         const created = await occurrencesService.create({
           ...formData,
           reported_by: user?.id,
+          municipality: user?.municipality,
         })
-        toast({ title: 'Ocorrência registrada com sucesso' })
+        toast({
+          title: 'Ocorrência registrada com sucesso',
+          description: `Código gerado: ${created.code || created.id}`,
+        })
 
         // Prompt alert creation if critical
         if (formData.severity === 'critica') {
@@ -273,6 +391,7 @@ export const OccurrencesPage: React.FC = () => {
     }
   }
 
+  // Delete
   const handleDelete = async () => {
     if (!selectedOccurrence) return
     try {
@@ -290,7 +409,23 @@ export const OccurrencesPage: React.FC = () => {
     }
   }
 
+  // Status Change with Role Permission Check
   const handleStatusChange = async (occ: Occurrence, newStatus: OccurrenceStatus) => {
+    // Regra: Agente não pode reabrir
+    const isReopening =
+      (occ.status === 'concluida' || occ.status === 'cancelada') &&
+      (newStatus === 'reportada' || newStatus === 'em_andamento')
+
+    if (isReopening && user?.role === 'agente') {
+      toast({
+        variant: 'destructive',
+        title: 'Ação não permitida',
+        description:
+          'Apenas Coordenadores ou Administradores podem reabrir ocorrências finalizadas.',
+      })
+      return
+    }
+
     try {
       const payload: Partial<Occurrence> = { status: newStatus }
       if (newStatus === 'concluida') {
@@ -308,19 +443,95 @@ export const OccurrencesPage: React.FC = () => {
     }
   }
 
+  // File Upload Handlers (Gallery/File and Camera PWA)
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !selectedOccurrence) return
+
+    try {
+      setIsUploadingFile(true)
+      const form = new FormData()
+      form.append('file', file)
+      form.append('occurrence', selectedOccurrence.id)
+      form.append('municipality', selectedOccurrence.municipality || user?.municipality || '')
+      form.append('uploaded_by', user?.id || '')
+
+      const isImage = file.type.startsWith('image/')
+      form.append('file_type', isImage ? 'foto' : 'documento')
+      form.append('caption', file.name)
+
+      await occurrenceFilesService.upload(form)
+      toast({ title: 'Anexo adicionado com sucesso!' })
+      loadOccurrenceFiles(selectedOccurrence.id)
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao enviar anexo',
+        description: getErrorMessage(err),
+      })
+    } finally {
+      setIsUploadingFile(false)
+      if (e.target) e.target.value = ''
+    }
+  }
+
+  const handleDeleteFile = async (fileId: string) => {
+    try {
+      await occurrenceFilesService.delete(fileId)
+      toast({ title: 'Anexo excluído' })
+      if (selectedOccurrence) {
+        loadOccurrenceFiles(selectedOccurrence.id)
+      }
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao excluir anexo',
+        description: getErrorMessage(err),
+      })
+    }
+  }
+
+  // Quick Requester Submit
+  const handleQuickRequesterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!quickReqData.name || !quickReqData.document) {
+      toast({ variant: 'destructive', title: 'Nome e CPF/CNPJ são obrigatórios' })
+      return
+    }
+
+    try {
+      const created = await requestersService.create({
+        ...quickReqData,
+        municipality: user?.municipality,
+      })
+      setRequesters((prev) => [created, ...prev])
+      setFormData((prev) => ({ ...prev, requester: created.id }))
+      setIsQuickRequesterOpen(false)
+      toast({ title: 'Requerente cadastrado e selecionado!' })
+    } catch (err) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao cadastrar requerente',
+        description: getErrorMessage(err),
+      })
+    }
+  }
+
   // Filter list
   const filteredOccurrences = occurrences.filter((occ) => {
     const matchText =
       !searchText ||
       occ.title.toLowerCase().includes(searchText.toLowerCase()) ||
       occ.description?.toLowerCase().includes(searchText.toLowerCase()) ||
-      occ.address?.toLowerCase().includes(searchText.toLowerCase())
+      occ.address?.toLowerCase().includes(searchText.toLowerCase()) ||
+      (occ.code && occ.code.toLowerCase().includes(searchText.toLowerCase()))
 
     const matchType = selectedType === 'all' || occ.type === selectedType
     const matchSeverity = selectedSeverity === 'all' || occ.severity === selectedSeverity
     const matchStatus = selectedStatus === 'all' || occ.status === selectedStatus
+    const matchOrigin = selectedOrigin === 'all' || occ.origin === selectedOrigin
 
-    return matchText && matchType && matchSeverity && matchStatus
+    return matchText && matchType && matchSeverity && matchStatus && matchOrigin
   })
 
   // Pagination calculation
@@ -329,7 +540,7 @@ export const OccurrencesPage: React.FC = () => {
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage,
   )
-  // Linked items for selected occurrence detail
+
   const linkedTeams = selectedOccurrence
     ? teams.filter((t) => t.current_occurrence === selectedOccurrence.id)
     : []
@@ -347,7 +558,8 @@ export const OccurrencesPage: React.FC = () => {
             Gestão de Ocorrências e Incidentes
           </h2>
           <p className="text-xs text-slate-500">
-            Registro, rastreamento georreferenciado e despacho de equipes de resposta rápida.
+            Registro com numeração oficial automática, georreferenciamento, triagem e despacho de
+            campo.
           </p>
         </div>
 
@@ -363,12 +575,12 @@ export const OccurrencesPage: React.FC = () => {
       {/* Filter Bar */}
       <Card className="border-slate-200 bg-white shadow-xs">
         <CardContent className="p-4 space-y-3">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             {/* Search Input */}
             <div className="relative">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <Input
-                placeholder="Buscar por título, endereço..."
+                placeholder="Buscar código OC-..., título..."
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 className="pl-9 h-9 text-xs rounded-lg"
@@ -407,7 +619,7 @@ export const OccurrencesPage: React.FC = () => {
             {/* Status Filter */}
             <Select value={selectedStatus} onValueChange={setSelectedStatus}>
               <SelectTrigger className="h-9 text-xs">
-                <SelectValue placeholder="Status do Workflow" />
+                <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos os Status</SelectItem>
@@ -417,24 +629,39 @@ export const OccurrencesPage: React.FC = () => {
                 <SelectItem value="cancelada">Cancelada</SelectItem>
               </SelectContent>
             </Select>
+
+            {/* Origin Filter */}
+            <Select value={selectedOrigin} onValueChange={setSelectedOrigin}>
+              <SelectTrigger className="h-9 text-xs">
+                <SelectValue placeholder="Origem" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as Origens</SelectItem>
+                {Object.keys(ORIGIN_LABELS).map((key) => (
+                  <SelectItem key={key} value={key}>
+                    {ORIGIN_LABELS[key]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
         </CardContent>
       </Card>
 
-      {/* Main Table / Cards View */}
+      {/* Main Table View */}
       <Card className="border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader className="bg-slate-50/80">
               <TableRow>
+                <TableHead className="text-xs font-bold text-slate-700">Código</TableHead>
                 <TableHead className="text-xs font-bold text-slate-700">
                   Tipo & Ocorrência
                 </TableHead>
+                <TableHead className="text-xs font-bold text-slate-700">Origem</TableHead>
                 <TableHead className="text-xs font-bold text-slate-700">Localização</TableHead>
                 <TableHead className="text-xs font-bold text-slate-700">Severidade</TableHead>
-                <TableHead className="text-xs font-bold text-slate-700">Status Workflow</TableHead>
-                <TableHead className="text-xs font-bold text-slate-700">Pop. Afetada</TableHead>
-                <TableHead className="text-xs font-bold text-slate-700">Data/Hora</TableHead>
+                <TableHead className="text-xs font-bold text-slate-700">Status</TableHead>
                 <TableHead className="text-xs font-bold text-slate-700 text-right">Ações</TableHead>
               </TableRow>
             </TableHeader>
@@ -442,12 +669,13 @@ export const OccurrencesPage: React.FC = () => {
               {paginatedOccurrences.map((occ) => (
                 <TableRow
                   key={occ.id}
-                  onClick={() => {
-                    setSelectedOccurrence(occ)
-                    setIsDetailOpen(true)
-                  }}
+                  onClick={() => openDetailModal(occ)}
                   className="cursor-pointer hover:bg-slate-50/90 transition-colors"
                 >
+                  <TableCell className="py-3.5 font-mono text-xs font-bold text-blue-700 whitespace-nowrap">
+                    {occ.code || '—'}
+                  </TableCell>
+
                   <TableCell className="py-3.5">
                     <div className="flex items-start gap-2.5">
                       <div className="p-2 rounded-lg bg-slate-100 shrink-0 mt-0.5">
@@ -460,6 +688,12 @@ export const OccurrencesPage: React.FC = () => {
                         </p>
                       </div>
                     </div>
+                  </TableCell>
+
+                  <TableCell className="text-xs text-slate-600 whitespace-nowrap">
+                    <Badge variant="outline" className="text-[10px] bg-slate-50">
+                      {ORIGIN_LABELS[occ.origin || '199'] || occ.origin || '199'}
+                    </Badge>
                   </TableCell>
 
                   <TableCell className="text-xs text-slate-600 font-medium">
@@ -490,26 +724,6 @@ export const OccurrencesPage: React.FC = () => {
                         <SelectItem value="cancelada">Cancelada</SelectItem>
                       </SelectContent>
                     </Select>
-                  </TableCell>
-
-                  <TableCell className="text-xs text-slate-700 font-semibold">
-                    {occ.affectable_population ? (
-                      <span className="flex items-center gap-1">
-                        <Users className="w-3.5 h-3.5 text-slate-400" />
-                        {occ.affectable_population.toLocaleString('pt-BR')}
-                      </span>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-
-                  <TableCell className="text-[11px] text-slate-500 whitespace-nowrap">
-                    {new Date(occ.created).toLocaleString('pt-BR', {
-                      day: '2-digit',
-                      month: '2-digit',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
                   </TableCell>
 
                   <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
@@ -586,23 +800,32 @@ export const OccurrencesPage: React.FC = () => {
         )}
       </Card>
 
-      {/* Detail Drawer / Modal */}
+      {/* Detail Modal with Code, Photos/Docs, and Reopening Actions */}
       {isDetailOpen && selectedOccurrence && (
         <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
+          <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto bg-white">
             <DialogHeader>
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2">
-                  <div className="p-2 rounded-lg bg-blue-50 text-blue-600">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2.5">
+                  <div className="p-2.5 rounded-lg bg-blue-50 text-blue-600 mt-0.5">
                     {getHazardIcon(selectedOccurrence.type, 'w-5 h-5')}
                   </div>
                   <div>
-                    <DialogTitle className="text-base font-bold text-slate-900 leading-tight">
-                      {selectedOccurrence.title}
-                    </DialogTitle>
-                    <p className="text-xs text-slate-500">
-                      ID: {selectedOccurrence.id} • Registrado em{' '}
-                      {new Date(selectedOccurrence.created).toLocaleString('pt-BR')}
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-mono font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
+                        {selectedOccurrence.code || 'SEM CÓDIGO'}
+                      </span>
+                      <DialogTitle className="text-base font-bold text-slate-900 leading-tight">
+                        {selectedOccurrence.title}
+                      </DialogTitle>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-1">
+                      Registrado em {new Date(selectedOccurrence.created).toLocaleString('pt-BR')} •
+                      Origem:{' '}
+                      <strong className="text-slate-700">
+                        {ORIGIN_LABELS[selectedOccurrence.origin || '199'] ||
+                          selectedOccurrence.origin}
+                      </strong>
                     </p>
                   </div>
                 </div>
@@ -622,12 +845,153 @@ export const OccurrencesPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Requerente Info if present */}
+              {selectedOccurrence.expand?.requester && (
+                <div className="p-3 bg-blue-50/60 rounded-lg border border-blue-200 text-xs flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <UserCheck className="w-4 h-4 text-blue-700" />
+                    <div>
+                      <p className="font-bold text-blue-900">
+                        Requerente: {selectedOccurrence.expand.requester.name}
+                      </p>
+                      <p className="text-[11px] text-blue-700">
+                        Doc: {selectedOccurrence.expand.requester.document} • Contato:{' '}
+                        {selectedOccurrence.expand.requester.phone || '—'}
+                      </p>
+                    </div>
+                  </div>
+                  <Badge variant="outline" className="border-blue-300 text-blue-800 bg-white">
+                    {selectedOccurrence.expand.requester.type === 'pj' ? 'PJ' : 'PF'}
+                  </Badge>
+                </div>
+              )}
+
               {/* Description */}
               <div>
                 <Label className="text-xs font-bold text-slate-700">Descrição do Ocorrido</Label>
                 <p className="mt-1 p-3 bg-slate-50 rounded-lg text-slate-700 leading-relaxed border border-slate-200">
                   {selectedOccurrence.description || 'Nenhum detalhe adicional informado.'}
                 </p>
+              </div>
+
+              {/* Anexos: Fotos e Documentos (Upload + Visualização) */}
+              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                    <ImageIcon className="w-4 h-4 text-blue-600" />
+                    Anexos e Fotos de Campo ({currentFiles.length})
+                  </Label>
+
+                  <div className="flex items-center gap-2">
+                    {/* Botão Câmera Celular (PWA) */}
+                    <input
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      ref={cameraInputRef}
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isUploadingFile}
+                      onClick={() => cameraInputRef.current?.click()}
+                      className="text-[11px] h-7 bg-white text-slate-700"
+                      title="Tirar foto na câmera"
+                    >
+                      <Camera className="w-3.5 h-3.5 mr-1 text-blue-600" />
+                      Câmera
+                    </Button>
+
+                    {/* Botão Galeria / Arquivo */}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileUpload}
+                      className="hidden"
+                    />
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={isUploadingFile}
+                      onClick={() => fileInputRef.current?.click()}
+                      className="text-[11px] h-7 bg-white text-slate-700"
+                      title="Enviar arquivo ou foto do dispositivo"
+                    >
+                      <Paperclip className="w-3.5 h-3.5 mr-1 text-slate-600" />
+                      Anexar Arquivo
+                    </Button>
+                  </div>
+                </div>
+
+                {isLoadingFiles ? (
+                  <div className="py-4 text-center text-slate-400">
+                    <Loader2 className="w-4 h-4 animate-spin mx-auto" />
+                  </div>
+                ) : currentFiles.length === 0 ? (
+                  <p className="text-[11px] text-slate-500 py-2">
+                    Nenhuma foto ou documento anexado a esta ocorrência ainda.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                    {currentFiles.map((fileRec) => {
+                      const fileUrl = occurrenceFilesService.getFileUrl(fileRec, fileRec.file)
+                      const isImg =
+                        fileRec.file_type === 'foto' ||
+                        /\.(jpg|jpeg|png|webp|gif)$/i.test(fileRec.file)
+
+                      return (
+                        <div
+                          key={fileRec.id}
+                          className="group relative bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col"
+                        >
+                          {isImg ? (
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="block h-24 overflow-hidden bg-slate-100"
+                            >
+                              <img
+                                src={fileUrl}
+                                alt={fileRec.caption || 'Foto'}
+                                className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                              />
+                            </a>
+                          ) : (
+                            <a
+                              href={fileUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="h-24 flex flex-col items-center justify-center p-2 text-slate-600 bg-slate-50 hover:bg-slate-100"
+                            >
+                              <FileText className="w-8 h-8 text-slate-400 mb-1" />
+                              <span className="text-[10px] font-medium text-center line-clamp-1">
+                                {fileRec.caption || fileRec.file}
+                              </span>
+                            </a>
+                          )}
+
+                          <div className="p-1.5 flex items-center justify-between bg-white text-[10px] border-t border-slate-100">
+                            <span className="text-slate-500 truncate max-w-[80px]">
+                              {fileRec.caption || 'Anexo'}
+                            </span>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => handleDeleteFile(fileRec.id)}
+                              className="w-5 h-5 text-slate-400 hover:text-red-600"
+                              title="Remover anexo"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </Button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Location and Map Preview */}
@@ -760,7 +1124,7 @@ export const OccurrencesPage: React.FC = () => {
         </Dialog>
       )}
 
-      {/* Create / Edit Form Modal */}
+      {/* Create / Edit Form Modal with CEP & Requerente */}
       <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto bg-white">
           <DialogHeader>
@@ -768,14 +1132,21 @@ export const OccurrencesPage: React.FC = () => {
               {selectedOccurrence ? 'Editar Ocorrência' : 'Registrar Nova Ocorrência'}
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-500">
-              Preencha os dados da ocorrência climática com coordenadas e severidade para pronta
-              resposta.
+              Numeração sequencial gerada automaticamente pelo servidor (ex. OC-2026-NNNNN).
             </DialogDescription>
           </DialogHeader>
 
           <form onSubmit={handleSave} className="space-y-4 text-xs">
+            {/* Título & Código Existente */}
             <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Título do Evento *</Label>
+              <div className="flex justify-between items-center">
+                <Label className="text-xs font-semibold text-slate-700">Título do Evento *</Label>
+                {formData.code && (
+                  <span className="font-mono text-xs font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                    Código: {formData.code}
+                  </span>
+                )}
+              </div>
               <Input
                 required
                 placeholder="Ex: Alagamento crítico na Bacia Central"
@@ -783,6 +1154,65 @@ export const OccurrencesPage: React.FC = () => {
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 className="h-9 text-xs"
               />
+            </div>
+
+            {/* Origem do Atendimento & Requerente */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-slate-700">
+                  Origem do Atendimento *
+                </Label>
+                <Select
+                  value={formData.origin || '199'}
+                  onValueChange={(val: OccurrenceOrigin) =>
+                    setFormData({ ...formData, origin: val })
+                  }
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.keys(ORIGIN_LABELS).map((key) => (
+                      <SelectItem key={key} value={key}>
+                        {ORIGIN_LABELS[key]}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <Label className="text-xs font-semibold text-slate-700">
+                    Requerente / Vítima
+                  </Label>
+                  <button
+                    type="button"
+                    onClick={() => setIsQuickRequesterOpen(true)}
+                    className="text-[11px] text-blue-600 hover:underline font-medium"
+                  >
+                    + Novo Requerente
+                  </button>
+                </div>
+                <Select
+                  value={formData.requester || 'none'}
+                  onValueChange={(val) =>
+                    setFormData({ ...formData, requester: val === 'none' ? undefined : val })
+                  }
+                >
+                  <SelectTrigger className="h-9 text-xs">
+                    <SelectValue placeholder="Selecione um requerente cadastrado" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Nenhum / Não informado</SelectItem>
+                    {requesters.map((r) => (
+                      <SelectItem key={r.id} value={r.id}>
+                        {r.name} ({r.document})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -846,35 +1276,63 @@ export const OccurrencesPage: React.FC = () => {
               </div>
             </div>
 
-            {/* Endereço com geocodificação via Nominatim (OpenStreetMap) */}
-            <div className="space-y-1.5">
-              <Label className="text-xs font-semibold text-slate-700">Endereço / Referência</Label>
-              <div className="flex gap-2">
-                <Input
-                  placeholder="Ex: Av. Beira Rio, 450 - Centro"
-                  value={formData.address || ''}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="h-9 text-xs"
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleGeocode}
-                  disabled={isGeocoding || !formData.address?.trim()}
-                  className="h-9 shrink-0 text-xs whitespace-nowrap"
-                >
-                  {isGeocoding ? (
-                    <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                  ) : (
-                    <MapPin className="w-3.5 h-3.5 mr-1.5" />
-                  )}
-                  Buscar coordenadas
-                </Button>
+            {/* CEP (ViaCEP) + Endereço */}
+            <div className="space-y-1.5 bg-slate-50/70 p-3 rounded-lg border border-slate-200">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <div className="space-y-1">
+                  <Label className="text-xs font-semibold text-slate-700">
+                    Consulta de CEP (ViaCEP)
+                  </Label>
+                  <div className="flex gap-1.5">
+                    <Input
+                      placeholder="00000-000"
+                      value={cepInput}
+                      onChange={(e) => setCepInput(e.target.value)}
+                      className="h-8 text-xs bg-white"
+                    />
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSearchCep}
+                      disabled={isSearchingCep}
+                      className="h-8 text-xs bg-white shrink-0"
+                    >
+                      {isSearchingCep ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : 'Buscar'}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="sm:col-span-2 space-y-1">
+                  <Label className="text-xs font-semibold text-slate-700">Endereço Completo</Label>
+                  <div className="flex gap-1.5">
+                    <Input
+                      placeholder="Rua, número, bairro, cidade"
+                      value={formData.address || ''}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      className="h-8 text-xs bg-white"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleGeocode}
+                      disabled={isGeocoding || !formData.address?.trim()}
+                      className="h-8 shrink-0 text-xs whitespace-nowrap bg-white"
+                    >
+                      {isGeocoding ? (
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      ) : (
+                        <MapPin className="w-3.5 h-3.5 mr-1" />
+                      )}
+                      Geocodificar
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
 
-            {/* Latitude / Longitude (numéricos, lado a lado) + População */}
+            {/* Latitude / Longitude + População */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-slate-700">Latitude</Label>
@@ -950,7 +1408,7 @@ export const OccurrencesPage: React.FC = () => {
                 </span>
               </div>
               <InteractiveMap
-                height="240px"
+                height="220px"
                 interactivePick={true}
                 showLayerToggles={false}
                 pickedCoordinate={{
@@ -964,6 +1422,7 @@ export const OccurrencesPage: React.FC = () => {
                 zoom={14}
               />
             </div>
+
             <DialogFooter className="pt-2">
               <Button
                 type="button"
@@ -981,6 +1440,89 @@ export const OccurrencesPage: React.FC = () => {
         </DialogContent>
       </Dialog>
 
+      {/* Quick Requester Modal */}
+      <Dialog open={isQuickRequesterOpen} onOpenChange={setIsQuickRequesterOpen}>
+        <DialogContent className="max-w-md bg-white">
+          <form onSubmit={handleQuickRequesterSubmit} className="space-y-3">
+            <DialogHeader>
+              <DialogTitle className="text-sm font-bold text-slate-900">
+                Cadastro Rápido de Requerente
+              </DialogTitle>
+              <DialogDescription className="text-xs text-slate-500">
+                Cadastre o cidadão ou entidade para vincular a esta ocorrência.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1">
+                <Label className="text-[11px]">Tipo *</Label>
+                <Select
+                  value={quickReqData.type || 'pf'}
+                  onValueChange={(val: 'pf' | 'pj') =>
+                    setQuickReqData({ ...quickReqData, type: val })
+                  }
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pf">Pessoa Física (PF)</SelectItem>
+                    <SelectItem value="pj">Pessoa Jurídica (PJ)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-[11px]">CPF / CNPJ *</Label>
+                <Input
+                  required
+                  placeholder="Documento"
+                  value={quickReqData.document || ''}
+                  onChange={(e) => setQuickReqData({ ...quickReqData, document: e.target.value })}
+                  className="h-8 text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[11px]">Nome / Razão Social *</Label>
+              <Input
+                required
+                placeholder="Nome do requerente"
+                value={quickReqData.name || ''}
+                onChange={(e) => setQuickReqData({ ...quickReqData, name: e.target.value })}
+                className="h-8 text-xs"
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label className="text-[11px]">Telefone de Contato</Label>
+              <Input
+                placeholder="(00) 00000-0000"
+                value={quickReqData.phone || ''}
+                onChange={(e) => setQuickReqData({ ...quickReqData, phone: e.target.value })}
+                className="h-8 text-xs"
+              />
+            </div>
+
+            <DialogFooter className="pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsQuickRequesterOpen(false)}
+                className="text-xs"
+              >
+                Voltar
+              </Button>
+              <Button type="submit" size="sm" className="bg-blue-600 text-white text-xs">
+                Cadastrar e Selecionar
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Delete Confirmation Modal */}
       <Dialog open={isDeleteModalOpen} onOpenChange={setIsDeleteModalOpen}>
         <DialogContent className="max-w-md bg-white">
@@ -990,7 +1532,7 @@ export const OccurrencesPage: React.FC = () => {
             </DialogTitle>
             <DialogDescription className="text-xs text-slate-600">
               Tem certeza que deseja excluir esta ocorrência ({selectedOccurrence?.title})? Esta
-              ação não poderá ser revertida.
+              ação ficará gravada na trilha de auditoria municipal.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="gap-2">

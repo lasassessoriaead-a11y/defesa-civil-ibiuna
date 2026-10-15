@@ -9,6 +9,11 @@ import type {
   WhatsAppMessage,
   AppSetting,
   WhatsAppConfigInfo,
+  Municipality,
+  Requester,
+  OccurrenceFile,
+  AuditLogEntry,
+  User,
 } from '@/types/defesa-civil'
 
 // Helper to normalize PB errors
@@ -20,19 +25,56 @@ export function getErrorMessage(err: unknown, fallback: string = 'Ocorreu um err
   return fallback
 }
 
+// Municipalities Service
+export const municipalitiesService = {
+  async list() {
+    return pb.collection('municipalities').getFullList<Municipality>({
+      sort: 'name',
+      requestKey: null,
+    })
+  },
+  async get(id: string) {
+    return pb.collection('municipalities').getOne<Municipality>(id, {
+      requestKey: null,
+    })
+  },
+  async update(id: string, data: Partial<Municipality>) {
+    return pb.collection('municipalities').update<Municipality>(id, data)
+  },
+}
+
+// Users Service
+export const usersService = {
+  async list(filter?: string) {
+    return pb.collection('users').getFullList<User>({
+      filter,
+      sort: 'name',
+      requestKey: null,
+    })
+  },
+  async get(id: string) {
+    return pb.collection('users').getOne<User>(id, {
+      requestKey: null,
+    })
+  },
+  async update(id: string, data: Partial<User>) {
+    return pb.collection('users').update<User>(id, data)
+  },
+}
+
 // Occurrences
 export const occurrencesService = {
   async list(filter?: string, sort = '-created') {
     return pb.collection('occurrences').getFullList<Occurrence>({
       filter,
       sort,
-      expand: 'reported_by',
+      expand: 'reported_by,requester,municipality',
       requestKey: null,
     })
   },
   async get(id: string) {
     return pb.collection('occurrences').getOne<Occurrence>(id, {
-      expand: 'reported_by',
+      expand: 'reported_by,requester,municipality',
       requestKey: null,
     })
   },
@@ -44,6 +86,63 @@ export const occurrencesService = {
   },
   async delete(id: string) {
     return pb.collection('occurrences').delete(id)
+  },
+}
+
+// Requesters (Requerentes)
+export const requestersService = {
+  async list(filter?: string, sort = 'name') {
+    return pb.collection('requesters').getFullList<Requester>({
+      filter,
+      sort,
+      requestKey: null,
+    })
+  },
+  async get(id: string) {
+    return pb.collection('requesters').getOne<Requester>(id, {
+      requestKey: null,
+    })
+  },
+  async create(data: Partial<Requester>) {
+    return pb.collection('requesters').create<Requester>(data)
+  },
+  async update(id: string, data: Partial<Requester>) {
+    return pb.collection('requesters').update<Requester>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('requesters').delete(id)
+  },
+}
+
+// Occurrence Files (Anexos)
+export const occurrenceFilesService = {
+  async listForOccurrence(occurrenceId: string) {
+    return pb.collection('occurrence_files').getFullList<OccurrenceFile>({
+      filter: `occurrence = "${occurrenceId}"`,
+      sort: '-created',
+      expand: 'uploaded_by',
+      requestKey: null,
+    })
+  },
+  async upload(formData: FormData) {
+    return pb.collection('occurrence_files').create<OccurrenceFile>(formData)
+  },
+  async delete(id: string) {
+    return pb.collection('occurrence_files').delete(id)
+  },
+  getFileUrl(record: OccurrenceFile, filename: string) {
+    return pb.files.getURL(record, filename)
+  },
+}
+
+// Audit Log (Trilha de Auditoria)
+export const auditLogService = {
+  async list(filter?: string, sort = '-created', limit = 100) {
+    return pb.collection('audit_log').getList<AuditLogEntry>(1, limit, {
+      filter,
+      sort,
+      requestKey: null,
+    })
   },
 }
 
@@ -176,7 +275,6 @@ export const whatsappService = {
   },
   async getMessagesForNumber(phoneNumber: string) {
     const clean = phoneNumber.replace(/\D/g, '')
-    // Match either from_number or to_number containing the clean number
     return pb.collection('whatsapp_messages').getFullList<WhatsAppMessage>({
       filter: `from_number ~ "${clean}" || to_number ~ "${clean}"`,
       sort: 'created',

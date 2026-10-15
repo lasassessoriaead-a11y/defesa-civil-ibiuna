@@ -1,0 +1,204 @@
+{
+  "backupTimestamp": "2026-10-15T17:00:00.000Z",
+  "reason": "Etapa 1 - Backup pré-migração multi-prefeitura e novos campos",
+  "collections": {
+    "users": [
+      {
+        "id": "yiph11qipwzepce",
+        "email": "luka2510@hotmail.com",
+        "name": "Defesa Civil Operador",
+        "created": "2026-08-19 08:56:04.134Z",
+        "updated": "2026-08-19 08:56:04.134Z",
+        "verified": true
+      },
+      {
+        "id": "rfeff9ia6sm78i0",
+        "email": "luis.gustavo@defesacivil.gov.br",
+        "name": "Luis Gustavo",
+        "created": "2026-08-19 20:43:36.396Z",
+        "updated": "2026-08-19 20:43:36.396Z",
+        "verified": true
+      }
+    ],
+    "occurrences": [
+      {
+        "id": "dvey2j1i4isys6f",
+        "title": "Alagamento",
+        "description": "",
+        "type": "enchente",
+        "severity": "media",
+        "status": "reportada",
+        "latitude": -23.54344,
+        "longitude": -46.62126,
+        "address": "Tu",
+        "affectable_population": 50,
+        "reported_by": "yiph11qipwzepce",
+        "resolved_at": "",
+        "created": "2026-08-20 13:47:29.837Z",
+        "updated": "2026-08-20 13:47:29.837Z"
+      },
+      {
+        "id": "gfkunku1thbd5ld",
+        "title": "Aaaa",
+        "description": "Poo",
+        "type": "enchente",
+        "severity": "alta",
+        "status": "reportada",
+        "latitude": -23.6603228,
+        "longitude": -47.2189188,
+        "address": "Rua Otávio Rosa ibiuna",
+        "affectable_population": 50,
+        "reported_by": "yiph11qipwzepce",
+        "resolved_at": "",
+        "created": "2026-08-20 13:47:51.664Z",
+        "updated": "2026-08-20 13:47:51.664Z"
+      },
+      {
+        "id": "suxdyfwbd7fa4z8",
+        "title": "Enxurrada",
+        "description": "",
+        "type": "seca",
+        "severity": "alta",
+        "status": "reportada",
+        "latitude": 11.5118487,
+        "longitude": 104.9003821,
+        "address": "Rua",
+        "affectable_population": 50,
+        "reported_by": "yiph11qipwzepce",
+        "resolved_at": "",
+        "created": "2026-10-15 16:01:22.897Z",
+        "updated": "2026-10-15 16:01:22.897Z"
+      }
+    ],
+    "teams": [
+      {
+        "id": "ij5mjcogdzvini9",
+        "name": "Corpo De Bombeiros Ibiuna",
+        "type": "resgate",
+        "leader_name": "Capitao Cabral",
+        "member_count": 20,
+        "status": "em_operacao",
+        "current_occurrence": "gfkunku1thbd5ld",
+        "latitude": -23.6541589,
+        "longitude": -47.2051069,
+        "created": "2026-08-20 01:49:28.919Z",
+        "updated": "2026-10-15 16:01:57.462Z"
+      }
+    ],
+    "supplies": [
+      {
+        "id": "2ej53wqgv3casv5",
+        "name": "Água mineral 5L",
+        "category": "agua",
+        "quantity": 130,
+        "unit": "caixas",
+        "status": "critico",
+        "location": "Galpão Central - Setor A",
+        "min_threshold": 200,
+        "created": "2026-08-19 08:56:04.137Z",
+        "updated": "2026-08-19 23:54:15.145Z"
+      },
+      {
+        "id": "1eshlhafdncj0sa",
+        "name": "Cestas básicas de emergência",
+        "category": "alimentos",
+        "quantity": 450,
+        "unit": "unidades",
+        "status": "disponivel",
+        "location": "Galpão Central - Setor B",
+        "min_threshold": 150,
+        "created": "2026-08-19 08:56:04.137Z",
+        "updated": "2026-08-19 08:56:04.137Z"
+      },
+      {
+        "id": "7jetjmke7z1gocq",
+        "name": "Cobertores térmicos",
+        "category": "roupas_cobertores",
+        "quantity": 60,
+        "unit": "unidades",
+        "status": "critico",
+        "location": "Depósito de Donativos",
+        "min_threshold": 100,
+        "created": "2026-08-19 08:56:04.137Z",
+        "updated": "2026-08-19 08:56:04.137Z"
+      },
+      {
+        "id": "zmldqd80zk0ynt1",
+        "name": "Kits de higiene familiar",
+        "category": "higiene",
+        "quantity": 300,
+        "unit": "kits",
+        "status": "disponivel",
+        "location": "Galpão Central - Setor C",
+        "min_threshold": 100,
+        "created": "2026-08-19 08:56:04.137Z",
+        "updated": "2026-08-19 08:56:04.137Z"
+      },
+      {
+        "id": "brml9utvejk6imt",
+        "name": "Colchonetes impermeáveis",
+        "category": "equipamentos",
+        "quantity": 0,
+        "unit": "unidades",
+        "status": "esgotado",
+        "location": "Depósito de Donativos",
+        "min_threshold": 50,
+        "created": "2026-08-19 08:56:04.138Z",
+        "updated": "2026-08-19 08:56:04.138Z"
+      },
+      {
+        "id": "f6bx4jbtemu5b4l",
+        "name": "Kits de Primeiros Socorros Avançados",
+        "category": "medicamentos",
+        "quantity": 45,
+        "unit": "kits",
+        "status": "disponivel",
+        "location": "Farmácia Central Municipal",
+        "min_threshold": 20,
+        "created": "2026-08-19 08:56:04.138Z",
+        "updated": "2026-08-19 08:56:04.138Z"
+      }
+    ],
+    "affected_areas": [
+      {
+        "id": "6nzuyj7otevom7a",
+        "name": "dsadasd",
+        "hazard_type": "tempestade",
+        "risk_level": "medio",
+        "status": "evacuado",
+        "coordinates": "-23.6919131,-47.341846",
+        "area_polygon": "[[-23.69189,-47.34382],[-23.69277,-47.34255],[-23.69176,-47.34082],[-23.69103,-47.34213]]",
+        "affected_population": 50,
+        "notes": "asdsad",
+        "created": "2026-08-20 02:10:52.528Z",
+        "updated": "2026-08-20 02:17:08.275Z"
+      },
+      {
+        "id": "9uq3h2u6k5b408p",
+        "name": "Rua José Cipriano de Freitas 131 ibiuna",
+        "hazard_type": "deslizamento",
+        "risk_level": "medio",
+        "status": "evacuado",
+        "coordinates": "-23.6589569,-47.2178998",
+        "area_polygon": "[[-23.65937,-47.21774],[-23.65901,-47.21686],[-23.65756,-47.21766],[-23.65762,-47.21843]]",
+        "affected_population": 20,
+        "notes": "Oi",
+        "created": "2026-08-20 13:43:45.635Z",
+        "updated": "2026-08-20 13:43:45.635Z"
+      }
+    ],
+    "shelters": [],
+    "alerts": [],
+    "whatsapp_messages": [],
+    "app_settings": [
+      {
+        "id": "pjkvex2o6x5xwlr",
+        "key": "whatsapp_ai_auto_reply",
+        "value": "true",
+        "description": "Atendimento automático por IA no WhatsApp",
+        "created": "2026-09-12 19:12:59.377Z",
+        "updated": "2026-09-12 19:12:59.377Z"
+      }
+    ]
+  }
+}

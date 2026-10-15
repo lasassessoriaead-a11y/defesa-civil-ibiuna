@@ -1,15 +1,15 @@
 {
-  "generatedAt": "2026-10-15T15:42:57.811Z",
+  "generatedAt": "2026-10-15T16:16:24.634Z",
   "collections": [
     {
       "name": "users",
       "type": "auth",
       "apiRules": {
-        "list": "id = @request.auth.id",
-        "view": "id = @request.auth.id",
+        "list": "@request.auth.id != '' && (id = @request.auth.id || (municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')))",
+        "view": "@request.auth.id != '' && (id = @request.auth.id || (municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')))",
         "create": "",
-        "update": "id = @request.auth.id",
-        "delete": "id = @request.auth.id"
+        "update": "@request.auth.id != '' && ((id = @request.auth.id && @request.body.role:changed = false && @request.body.municipality:changed = false) || (@request.auth.role = 'administrador' && municipality = @request.auth.municipality))",
+        "delete": "@request.auth.id != '' && @request.auth.role = 'administrador' && municipality = @request.auth.municipality && id != @request.auth.id"
       },
       "fields": [
         {
@@ -37,6 +37,20 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "role",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["administrador", "coordenador", "agente"]
+        },
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "municipalities"
         }
       ],
       "indexes": [
@@ -48,11 +62,11 @@
       "name": "occurrences",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
         {
@@ -146,24 +160,59 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "origin",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "199",
+            "denuncia",
+            "telefone",
+            "redes_sociais",
+            "processo_administrativo",
+            "outro"
+          ]
+        },
+        {
+          "name": "requester",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "requesters"
         }
       ],
       "indexes": [
         "CREATE INDEX idx_occ_status ON occurrences (status)",
         "CREATE INDEX idx_occ_type ON occurrences (type)",
         "CREATE INDEX idx_occ_severity ON occurrences (severity)",
-        "CREATE INDEX idx_occ_created ON occurrences (created DESC)"
+        "CREATE INDEX idx_occ_created ON occurrences (created DESC)",
+        "CREATE UNIQUE INDEX `idx_occ_code_mun` ON `occurrences` (municipality, code) WHERE code != ''"
       ]
     },
     {
       "name": "shelters",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
         {
@@ -228,6 +277,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "municipalities"
         }
       ],
       "indexes": ["CREATE INDEX idx_shelters_status ON shelters (status)"]
@@ -236,11 +292,11 @@
       "name": "teams",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
         {
@@ -314,6 +370,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "municipalities"
         }
       ],
       "indexes": [
@@ -325,11 +388,11 @@
       "name": "supplies",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
         {
@@ -398,6 +461,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "municipalities"
         }
       ],
       "indexes": [
@@ -409,11 +479,11 @@
       "name": "alerts",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
         {
@@ -503,6 +573,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "municipalities"
         }
       ],
       "indexes": [
@@ -515,11 +592,11 @@
       "name": "affected_areas",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
         {
@@ -586,6 +663,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "municipalities"
         }
       ],
       "indexes": [
@@ -597,11 +681,11 @@
       "name": "whatsapp_messages",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
         {
@@ -668,6 +752,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "municipalities"
         }
       ],
       "indexes": [
@@ -723,6 +814,387 @@
         }
       ],
       "indexes": ["CREATE UNIQUE INDEX idx_app_settings_key ON app_settings (key)"]
+    },
+    {
+      "name": "municipalities",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != '' && @request.auth.role = 'administrador'",
+        "update": "@request.auth.id != '' && @request.auth.role = 'administrador' && @request.auth.municipality = id",
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "city",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "state",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "logo",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "doc_header",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "doc_footer",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "settings",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_mun_name ON municipalities (name)",
+        "CREATE INDEX idx_mun_city_state ON municipalities (city, state)"
+      ]
+    },
+    {
+      "name": "occurrence_counters",
+      "type": "base",
+      "apiRules": {
+        "list": null,
+        "view": null,
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "year",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "last_number",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_occ_counter_mun_year ON occurrence_counters (municipality, year)"
+      ]
+    },
+    {
+      "name": "requesters",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["pf", "pj"]
+        },
+        {
+          "name": "document",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "rg",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_requester_doc_mun ON requesters (municipality, document)",
+        "CREATE INDEX idx_requester_name ON requesters (name)"
+      ]
+    },
+    {
+      "name": "occurrence_files",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "occurrence",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "occurrences"
+        },
+        {
+          "name": "file",
+          "type": "file",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "file_type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["foto", "documento", "outro"]
+        },
+        {
+          "name": "caption",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "uploaded_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_occ_files_occ ON occurrence_files (occurrence)",
+        "CREATE INDEX idx_occ_files_mun ON occurrence_files (municipality)"
+      ]
+    },
+    {
+      "name": "audit_log",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "user",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "user_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "user_email",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "action",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "collection",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "record_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "details",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_before",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "data_after",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "origin",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["online", "offline"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_audit_mun_created ON audit_log (municipality, created DESC)",
+        "CREATE INDEX idx_audit_action ON audit_log (action)",
+        "CREATE INDEX idx_audit_record ON audit_log (collection, record_id)"
+      ]
     }
   ]
 }

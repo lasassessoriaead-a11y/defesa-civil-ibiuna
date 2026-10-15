@@ -1,5 +1,17 @@
 import type { RecordModel } from 'pocketbase'
 
+export type UserRole = 'administrador' | 'coordenador' | 'agente'
+
+export interface Municipality extends RecordModel {
+  name: string
+  city: string
+  state: string
+  logo?: string
+  doc_header?: string
+  doc_footer?: string
+  settings?: Record<string, unknown>
+}
+
 export type OccurrenceType =
   | 'enchente'
   | 'deslizamento'
@@ -11,13 +23,24 @@ export type OccurrenceType =
 
 export type OccurrenceSeverity = 'baixa' | 'media' | 'alta' | 'critica'
 export type OccurrenceStatus = 'reportada' | 'em_andamento' | 'concluida' | 'cancelada'
+export type OccurrenceOrigin =
+  | '199'
+  | 'denuncia'
+  | 'telefone'
+  | 'redes_sociais'
+  | 'processo_administrativo'
+  | 'outro'
 
 export interface Occurrence extends RecordModel {
+  code?: string
   title: string
   description?: string
   type: OccurrenceType
   severity: OccurrenceSeverity
   status: OccurrenceStatus
+  origin?: OccurrenceOrigin
+  municipality?: string
+  requester?: string
   latitude?: number
   longitude?: number
   address?: string
@@ -30,7 +53,50 @@ export interface Occurrence extends RecordModel {
       name?: string
       email?: string
     }
+    requester?: Requester
+    municipality?: Municipality
   }
+}
+
+export interface Requester extends RecordModel {
+  municipality: string
+  name: string
+  type: 'pf' | 'pj'
+  document: string // CPF ou CNPJ
+  rg?: string
+  phone?: string
+  email?: string
+  address?: string
+  notes?: string
+}
+
+export interface OccurrenceFile extends RecordModel {
+  municipality: string
+  occurrence: string
+  file: string
+  file_type: 'foto' | 'documento' | 'outro'
+  caption?: string
+  uploaded_by?: string
+  expand?: {
+    uploaded_by?: {
+      id: string
+      name?: string
+    }
+  }
+}
+
+export interface AuditLogEntry extends RecordModel {
+  municipality: string
+  user?: string
+  user_name?: string
+  user_email?: string
+  action: string
+  collection: string
+  record_id: string
+  details?: string
+  data_before?: string
+  data_after?: string
+  origin?: 'online' | 'offline'
 }
 
 export type ShelterStatus = 'ativo' | 'cheio' | 'inativo'
@@ -44,6 +110,7 @@ export interface Shelter extends RecordModel {
   occupancy?: number
   status: ShelterStatus
   contact?: string
+  municipality?: string
 }
 
 export type TeamType =
@@ -64,6 +131,7 @@ export interface Team extends RecordModel {
   current_occurrence?: string
   latitude?: number
   longitude?: number
+  municipality?: string
   expand?: {
     current_occurrence?: Occurrence
   }
@@ -89,6 +157,7 @@ export interface Supply extends RecordModel {
   status: SupplyStatus
   location?: string
   min_threshold?: number
+  municipality?: string
 }
 
 export type AlertType =
@@ -115,6 +184,7 @@ export interface Alert extends RecordModel {
   scheduled_at?: string
   sent_by?: string
   related_occurrence?: string
+  municipality?: string
   expand?: {
     sent_by?: {
       id: string
@@ -138,6 +208,7 @@ export interface AffectedArea extends RecordModel {
   coordinates?: string // "lat,lng" centroid
   affected_population?: number
   notes?: string
+  municipality?: string
 }
 
 export interface User {
@@ -145,6 +216,11 @@ export interface User {
   email: string
   name?: string
   avatar?: string
+  role?: UserRole
+  municipality?: string
+  expand?: {
+    municipality?: Municipality
+  }
 }
 
 export type WhatsAppDirection = 'incoming' | 'outgoing'
@@ -159,6 +235,7 @@ export interface WhatsAppMessage extends RecordModel {
   occurrence?: string
   twilio_sid?: string
   error?: string
+  municipality?: string
   expand?: {
     occurrence?: Occurrence
   }

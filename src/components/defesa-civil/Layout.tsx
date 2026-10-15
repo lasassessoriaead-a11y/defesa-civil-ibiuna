@@ -21,6 +21,7 @@ import {
   ChevronRight,
   Shield,
   PhoneCall,
+  UserCheck,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -54,6 +55,9 @@ const navItems: NavItem[] = [
   { title: 'Alertas', href: '/alertas', icon: Bell },
   { title: 'WhatsApp', href: '/whatsapp', icon: MessageSquare },
   { title: 'Áreas Afetadas', href: '/areas-afetadas', icon: Map },
+  { title: 'Requerentes', href: '/requerentes', icon: Users },
+  { title: 'Auditoria', href: '/auditoria', icon: Shield },
+  { title: 'Usuários', href: '/usuarios', icon: UserCheck },
   { title: 'Assistente IA', href: '/assistente', icon: Bot },
 ]
 
@@ -132,7 +136,9 @@ export const Layout: React.FC = () => {
             <h1 className="font-bold text-sm tracking-tight text-white leading-tight">
               DEFESA CIVIL
             </h1>
-            <p className="text-[11px] text-blue-400 font-medium">Gestão de Desastres</p>
+            <p className="text-[11px] text-blue-400 font-medium truncate max-w-[130px]">
+              {user?.role ? user.role.toUpperCase() : 'MUNICIPAL'}
+            </p>
           </div>
         </div>
 
@@ -202,9 +208,14 @@ export const Layout: React.FC = () => {
                 </AvatarFallback>
               </Avatar>
               <div className="truncate">
-                <p className="text-xs font-semibold text-white truncate leading-tight">
-                  {user?.name || 'Operador Civil'}
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-semibold text-white truncate leading-tight">
+                    {user?.name || 'Operador Civil'}
+                  </p>
+                  <span className="text-[9px] uppercase px-1 rounded bg-slate-700 text-slate-200">
+                    {user?.role || 'agente'}
+                  </span>
+                </div>
                 <p className="text-[10px] text-slate-400 truncate">{user?.email}</p>
               </div>
             </div>

@@ -12,6 +12,9 @@ import { AlertsPage } from '@/pages/AlertsPage'
 import { WhatsAppPage } from '@/pages/WhatsAppPage'
 import { AffectedAreasPage } from '@/pages/AffectedAreasPage'
 import { AssistantPage } from '@/pages/AssistantPage'
+import { RequestersPage } from '@/pages/RequestersPage'
+import { AuditLogPage } from '@/pages/AuditLogPage'
+import { UsersManagementPage } from '@/pages/UsersManagementPage'
 import NotFound from '@/pages/NotFound'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -96,6 +99,9 @@ export const App: React.FC = () => {
             <Route path="/whatsapp" element={<WhatsAppPage />} />
             <Route path="/areas-afetadas" element={<AffectedAreasPage />} />
             <Route path="/assistente" element={<AssistantPage />} />
+            <Route path="/requerentes" element={<RequestersPage />} />
+            <Route path="/auditoria" element={<AuditLogPage />} />
+            <Route path="/usuarios" element={<UsersManagementPage />} />
           </Route>
 
           {/* 404 Fallback */}
