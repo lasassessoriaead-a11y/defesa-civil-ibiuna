@@ -31,7 +31,34 @@ onRecordCreate((e) => {
     record.set('origin', '199')
   }
 
-  // Gera código sequencial se ainda não possuir
+  // Idempotência por client_uuid
+  const clientUuid = record.getString('client_uuid')
+  if (clientUuid && munId) {
+    try {
+      const existing = $app.findFirstRecordByFilter(
+        'occurrences',
+        "client_uuid = '" + clientUuid + "' && municipality = '" + munId + "'",
+      )
+      if (existing && existing.id) {
+        throw new BadRequestError(
+          'DUPLICATE_CLIENT_UUID:' + existing.id + ':' + (existing.getString('code') || ''),
+        )
+      }
+    } catch (findErr) {
+      if (findErr.message && findErr.message.indexOf('DUPLICATE_CLIENT_UUID') !== -1) {
+        throw findErr
+      }
+    }
+  }
+
+  // Se veio código provisório no campo prov_code ou code
+  const currentCode = record.getString('code')
+  if (currentCode && currentCode.startsWith('OFF-') && !record.getString('prov_code')) {
+    record.set('prov_code', currentCode)
+    record.set('code', '') // limpa para gerar o oficial atômico abaixo
+  }
+
+  // Gera código sequencial oficial atômico se ainda não possuir
   if (!record.getString('code') && munId) {
     const year = new Date().getFullYear()
 
@@ -60,6 +87,8 @@ onRecordCreate((e) => {
     })
   }
 
+  record.set('sync_status', 'synced')
+
   e.next()
 
   // Auditoria pós-criação inline
@@ -76,17 +105,23 @@ onRecordCreate((e) => {
       auditRec.set('user', record.getString('reported_by'))
       auditRec.set('user_name', 'Operador')
     }
-    auditRec.set('action', 'create')
+
+    const wasOffline = !!record.getString('prov_code') || !!clientUuid
+    auditRec.set('action', wasOffline ? 'sync_create' : 'create')
     auditRec.set('collection', 'occurrences')
     auditRec.set('record_id', record.id)
     auditRec.set(
       'details',
-      'Criação da ocorrência ' +
+      (wasOffline ? '[Sincronização Offline] ' : '') +
+        'Criação da ocorrência ' +
         (record.getString('code') || record.id) +
+        (record.getString('prov_code')
+          ? ' (Provisório: ' + record.getString('prov_code') + ')'
+          : '') +
         ': ' +
         record.getString('title'),
     )
-    auditRec.set('origin', 'online')
+    auditRec.set('origin', wasOffline ? 'offline' : 'online')
 
     const safeAfter = {
       id: record.id,

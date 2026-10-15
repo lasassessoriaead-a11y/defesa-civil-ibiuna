@@ -188,7 +188,7 @@ export const TreeAuthorizationsPage: React.FC = () => {
     })
   }
 
-  // Salvar autorização
+  // Salvar autorização (online ou offline)
   const handleSave = async (asIssued = false) => {
     if (!formData.requester) {
       toast({
@@ -207,6 +207,7 @@ export const TreeAuthorizationsPage: React.FC = () => {
       return
     }
 
+    // Validação frontend de usuário designado
     if (asIssued && !isUserDesignatedIssuer()) {
       toast({
         title: 'Permissão Negada',
@@ -234,6 +235,8 @@ export const TreeAuthorizationsPage: React.FC = () => {
       }
 
       let saved: TreeAuthorization
+      const agentName = user?.name || 'Agente'
+
       if (editingAuth) {
         saved = await treeAuthorizationsService.update(editingAuth.id, payload)
         toast({
@@ -243,19 +246,27 @@ export const TreeAuthorizationsPage: React.FC = () => {
             : 'As alterações foram salvas com sucesso.',
         })
       } else {
-        saved = await treeAuthorizationsService.create(payload)
+        saved = await treeAuthorizationsService.create(payload, agentName)
+        const isOffline = saved.id.startsWith('temp_') || saved.number?.startsWith('OFF-')
+
         toast({
-          title: asIssued ? 'Autorização Emitida com Sucesso!' : 'Rascunho Salvo',
-          description: asIssued
-            ? `Autorização oficial registrada: ${saved.number} (Validade: 90 dias)`
-            : 'Novo rascunho de autorização criado.',
+          title: isOffline
+            ? 'Autorização salva em fila offline!'
+            : asIssued
+              ? 'Autorização Emitida com Sucesso!'
+              : 'Rascunho Salvo',
+          description: isOffline
+            ? `Identificação provisória: ${saved.number}. O servidor revalidará suas permissões na reconexão antes de emitir a numeração oficial atômica.`
+            : asIssued
+              ? `Autorização oficial registrada: ${saved.number} (Validade: 90 dias)`
+              : 'Novo rascunho de autorização criado.',
         })
       }
 
       setIsEditorOpen(false)
       loadData()
 
-      if (asIssued) {
+      if (asIssued && saved.number && !saved.number.startsWith('OFF-')) {
         setViewingAuth(saved)
         setIsPrintOpen(true)
       }

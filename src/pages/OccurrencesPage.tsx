@@ -346,15 +346,25 @@ export const OccurrencesPage: React.FC = () => {
         await occurrencesService.update(selectedOccurrence.id, payload)
         toast({ title: 'Ocorrência atualizada com sucesso' })
       } else {
-        // Create
-        const created = await occurrencesService.create({
-          ...formData,
-          reported_by: user?.id,
-          municipality: user?.municipality,
-        })
+        // Create (online ou offline)
+        const agentName = user?.name || 'Agente'
+        const created = await occurrencesService.create(
+          {
+            ...formData,
+            reported_by: user?.id,
+            municipality: user?.municipality,
+          },
+          agentName,
+        )
+
+        const isOfflineCreated = created.id.startsWith('temp_') || created.code?.startsWith('OFF-')
         toast({
-          title: 'Ocorrência registrada com sucesso',
-          description: `Código gerado: ${created.code || created.id}`,
+          title: isOfflineCreated
+            ? 'Ocorrência salva offline com sucesso!'
+            : 'Ocorrência registrada com sucesso',
+          description: isOfflineCreated
+            ? `Código provisório: ${created.code}. Será sincronizada e receberá numeração oficial atômica automaticamente ao reconectar.`
+            : `Código oficial gerado: ${created.code || created.id}`,
         })
 
         // Prompt alert creation if critical
@@ -443,26 +453,46 @@ export const OccurrencesPage: React.FC = () => {
     }
   }
 
-  // File Upload Handlers (Gallery/File and Camera PWA)
+  // File Upload Handlers (Gallery/File and Camera PWA) com fila offline segura
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !selectedOccurrence) return
 
     try {
       setIsUploadingFile(true)
-      const form = new FormData()
-      form.append('file', file)
-      form.append('occurrence', selectedOccurrence.id)
-      form.append('municipality', selectedOccurrence.municipality || user?.municipality || '')
-      form.append('uploaded_by', user?.id || '')
+      const isOnline = navigator.onLine
 
-      const isImage = file.type.startsWith('image/')
-      form.append('file_type', isImage ? 'foto' : 'documento')
-      form.append('caption', file.name)
+      if (!isOnline || selectedOccurrence.id.startsWith('temp_')) {
+        // Requisito 4: Anexos offline ficam em fila local.
+        // Após reconexão: (1) confirmar registro principal; (2) enviar arquivos; (3) vincular; (4) confirmar; (5) remover da fila
+        const { offlineSyncManager } = await import('@/services/offline-sync')
+        await offlineSyncManager.saveOccurrenceFileOffline({
+          occurrenceIdOrClientUuid: selectedOccurrence.id,
+          fileBlob: file,
+          fileName: file.name,
+          fileType: file.type.startsWith('image/') ? 'foto' : 'documento',
+          caption: file.name,
+        })
+        toast({
+          title: 'Foto/Arquivo armazenado localmente!',
+          description:
+            'O arquivo está em fila segura no dispositivo e será enviado assim que a conexão for reestabelecida.',
+        })
+      } else {
+        const form = new FormData()
+        form.append('file', file)
+        form.append('occurrence', selectedOccurrence.id)
+        form.append('municipality', selectedOccurrence.municipality || user?.municipality || '')
+        form.append('uploaded_by', user?.id || '')
 
-      await occurrenceFilesService.upload(form)
-      toast({ title: 'Anexo adicionado com sucesso!' })
-      loadOccurrenceFiles(selectedOccurrence.id)
+        const isImage = file.type.startsWith('image/')
+        form.append('file_type', isImage ? 'foto' : 'documento')
+        form.append('caption', file.name)
+
+        await occurrenceFilesService.upload(form)
+        toast({ title: 'Anexo adicionado com sucesso!' })
+        loadOccurrenceFiles(selectedOccurrence.id)
+      }
     } catch (err) {
       toast({
         variant: 'destructive',

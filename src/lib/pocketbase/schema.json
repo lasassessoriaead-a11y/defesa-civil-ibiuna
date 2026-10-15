@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-15T16:42:15.176Z",
+  "generatedAt": "2026-10-15T16:55:26.715Z",
   "collections": [
     {
       "name": "users",
@@ -194,6 +194,25 @@
           "required": false,
           "system": false,
           "collectionRef": "requesters"
+        },
+        {
+          "name": "client_uuid",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prov_code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sync_status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["synced", "pending"]
         }
       ],
       "indexes": [
@@ -201,7 +220,8 @@
         "CREATE INDEX idx_occ_type ON occurrences (type)",
         "CREATE INDEX idx_occ_severity ON occurrences (severity)",
         "CREATE INDEX idx_occ_created ON occurrences (created DESC)",
-        "CREATE UNIQUE INDEX `idx_occ_code_mun` ON `occurrences` (municipality, code) WHERE code != ''"
+        "CREATE UNIQUE INDEX `idx_occ_code_mun` ON `occurrences` (municipality, code) WHERE code != ''",
+        "CREATE UNIQUE INDEX `idx_occ_client_uuid_mun` ON `occurrences` (client_uuid, municipality) WHERE client_uuid != \"\" AND client_uuid IS NOT NULL"
       ]
     },
     {
@@ -1024,6 +1044,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "client_uuid",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -1095,6 +1121,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "client_uuid",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -1466,6 +1498,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "client_uuid",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -1624,6 +1662,18 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "client_uuid",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "prov_code",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

@@ -81,6 +81,8 @@ export interface TreeAuthorization extends RecordModel {
   authorized_by_name?: string
   authorized_by_role?: string
   created_by?: string
+  client_uuid?: string
+  prov_code?: string
   expand?: {
     municipality?: Municipality
     requester?: Requester
@@ -130,6 +132,9 @@ export interface Occurrence extends RecordModel {
   affectable_population?: number
   reported_by?: string
   resolved_at?: string
+  client_uuid?: string
+  prov_code?: string
+  sync_status?: 'synced' | 'pending'
   expand?: {
     reported_by?: {
       id: string
@@ -140,6 +145,33 @@ export interface Occurrence extends RecordModel {
     municipality?: Municipality
   }
 }
+
+export interface SyncQueueItem {
+  id: string // internal queue id (UUID)
+  client_uuid: string // deduplication key
+  municipality: string
+  userId: string
+  entityType:
+    | 'requester'
+    | 'occurrence'
+    | 'occurrence_file'
+    | 'tree_authorization'
+    | 'official_document'
+  action: 'create' | 'update' | 'delete'
+  prov_code?: string
+  payload: Record<string, any>
+  fileBlob?: Blob
+  fileName?: string
+  fileFieldName?: string
+  dependsOnClientUuid?: string // ex: attachment depends on occurrence client_uuid
+  status: 'pending' | 'processing' | 'failed' | 'synced'
+  retryCount: number
+  lastError?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export type NetworkSyncStatus = 'online_synced' | 'offline_pending' | 'syncing' | 'sync_error'
 
 export interface Requester extends RecordModel {
   municipality: string
@@ -160,6 +192,7 @@ export interface OccurrenceFile extends RecordModel {
   file_type: 'foto' | 'documento' | 'outro'
   caption?: string
   uploaded_by?: string
+  client_uuid?: string
   expand?: {
     uploaded_by?: {
       id: string

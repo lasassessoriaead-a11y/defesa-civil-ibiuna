@@ -41,6 +41,7 @@ import {
 import { useAuth } from '@/contexts/AuthContext'
 import { useRealtime } from '@/hooks/use-realtime'
 import { occurrencesService, suppliesService } from '@/services/defesa-civil'
+import { ConnectionStatusBadge } from '@/components/defesa-civil/ConnectionStatusBadge'
 import type { Occurrence, Supply } from '@/types/defesa-civil'
 
 interface NavItem {
@@ -273,27 +274,8 @@ export const Layout: React.FC = () => {
 
           {/* Right Status Indicators & Notifications */}
           <div className="flex items-center gap-2 shrink-0">
-            {/* Realtime Connectivity indicator */}
-            <div
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border ${
-                isOnline
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                  : 'bg-red-50 text-red-700 border-red-200'
-              }`}
-              title={isOnline ? 'Conexão em Tempo Real Ativa' : 'Offline - Tentando reconectar'}
-            >
-              {isOnline ? (
-                <>
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                  <span className="hidden lg:inline">Tempo Real</span>
-                </>
-              ) : (
-                <>
-                  <WifiOff className="w-3 h-3 text-red-500" />
-                  <span className="hidden lg:inline">Offline</span>
-                </>
-              )}
-            </div>
+            {/* Realtime / Offline Connectivity indicator discretely integrated */}
+            <ConnectionStatusBadge />
 
             {/* Notification Badges Group */}
             <Link

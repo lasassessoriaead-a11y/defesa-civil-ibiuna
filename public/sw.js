@@ -1,5 +1,5 @@
 /* Service Worker for Defesa Civil Municipal PWA */
-const CACHE_VERSION = 'defesa-civil-v1'
+const CACHE_VERSION = 'defesa-civil-v2'
 const STATIC_CACHE = `defesa-civil-static-${CACHE_VERSION}`
 const RUNTIME_CACHE = `defesa-civil-runtime-${CACHE_VERSION}`
 
@@ -11,6 +11,11 @@ const PRECACHE_ASSETS = [
   '/pwa-icon.svg',
   '/pwa-icon-maskable.svg',
   '/favicon.ico',
+  '/painel',
+  '/ocorrencias',
+  '/oficios',
+  '/autorizacoes',
+  '/relatorios',
 ]
 
 // Install event: Precache application shell
@@ -94,14 +99,16 @@ self.addEventListener('fetch', (event) => {
   // Static assets (scripts, styles, images, fonts)
   // Stale-While-Revalidate or Cache-First with network fallback
   const isStaticAsset =
-    url.origin === self.location.origin &&
-    (url.pathname.startsWith('/assets/') ||
-      url.pathname.endsWith('.js') ||
-      url.pathname.endsWith('.css') ||
-      url.pathname.endsWith('.svg') ||
-      url.pathname.endsWith('.png') ||
-      url.pathname.endsWith('.ico') ||
-      url.pathname.endsWith('.woff2'))
+    (url.origin === self.location.origin &&
+      (url.pathname.startsWith('/assets/') ||
+        url.pathname.endsWith('.js') ||
+        url.pathname.endsWith('.css') ||
+        url.pathname.endsWith('.svg') ||
+        url.pathname.endsWith('.png') ||
+        url.pathname.endsWith('.ico') ||
+        url.pathname.endsWith('.woff2'))) ||
+    url.hostname.includes('unpkg.com') ||
+    url.hostname.includes('tile.openstreetmap.org')
 
   if (isStaticAsset) {
     event.respondWith(

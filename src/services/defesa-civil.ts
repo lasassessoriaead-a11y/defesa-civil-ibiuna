@@ -1,4 +1,6 @@
 import pb from '@/lib/pocketbase/client'
+import { offlineDb } from './offline-db'
+import { offlineSyncManager } from './offline-sync'
 import type {
   Occurrence,
   Shelter,
@@ -119,15 +121,39 @@ export const officialDocumentsService = {
   },
 }
 
-// Tree Authorizations (Autorizações de Corte e Poda)
+// Tree Authorizations (Autorizações de Corte e Poda) com cache e offline
 export const treeAuthorizationsService = {
   async list(filter?: string, sort = '-created') {
-    return pb.collection('tree_authorizations').getFullList<TreeAuthorization>({
-      filter,
-      sort,
-      expand: 'municipality,requester,authorized_by,created_by',
-      requestKey: null,
-    })
+    const authUser = pb.authStore.record
+    const scope = authUser
+      ? { userId: authUser.id, municipalityId: authUser.municipality || 'default' }
+      : null
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine && scope) {
+      return offlineDb.getCachedEntities<TreeAuthorization>(scope, 'tree_authorizations')
+    }
+
+    try {
+      const records = await pb.collection('tree_authorizations').getFullList<TreeAuthorization>({
+        filter,
+        sort,
+        expand: 'municipality,requester,authorized_by,created_by',
+        requestKey: null,
+      })
+      if (scope) {
+        offlineDb.cacheEntities(scope, 'tree_authorizations', records).catch(() => {})
+      }
+      return records
+    } catch (err) {
+      if (scope) {
+        const cached = await offlineDb.getCachedEntities<TreeAuthorization>(
+          scope,
+          'tree_authorizations',
+        )
+        if (cached.length > 0) return cached
+      }
+      throw err
+    }
   },
   async get(id: string) {
     return pb.collection('tree_authorizations').getOne<TreeAuthorization>(id, {
@@ -135,8 +161,27 @@ export const treeAuthorizationsService = {
       requestKey: null,
     })
   },
-  async create(data: Partial<TreeAuthorization>) {
-    return pb.collection('tree_authorizations').create<TreeAuthorization>(data)
+  async create(data: Partial<TreeAuthorization>, agentName = 'Agente') {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const { tempRecord } = await offlineSyncManager.saveTreeAuthorizationOffline(data, agentName)
+      return tempRecord
+    }
+    const clientUuid = `aut_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    const record = await pb.collection('tree_authorizations').create<TreeAuthorization>({
+      ...data,
+      client_uuid: clientUuid,
+    })
+    const authUser = pb.authStore.record
+    if (authUser) {
+      offlineDb
+        .putSingleCachedEntity(
+          { userId: authUser.id, municipalityId: authUser.municipality || 'default' },
+          'tree_authorizations',
+          record,
+        )
+        .catch(() => {})
+    }
+    return record
   },
   async update(id: string, data: Partial<TreeAuthorization>) {
     return pb.collection('tree_authorizations').update<TreeAuthorization>(id, data)
@@ -165,15 +210,40 @@ export const usersService = {
   },
 }
 
-// Occurrences
+// Occurrences com suporte a cache de leitura e offline
 export const occurrencesService = {
   async list(filter?: string, sort = '-created') {
-    return pb.collection('occurrences').getFullList<Occurrence>({
-      filter,
-      sort,
-      expand: 'reported_by,requester,municipality',
-      requestKey: null,
-    })
+    const authUser = pb.authStore.record
+    const scope = authUser
+      ? { userId: authUser.id, municipalityId: authUser.municipality || 'default' }
+      : null
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine && scope) {
+      // Offline: Ler do cache IndexedDB
+      const cached = await offlineDb.getCachedEntities<Occurrence>(scope, 'occurrences')
+      return cached
+    }
+
+    try {
+      const records = await pb.collection('occurrences').getFullList<Occurrence>({
+        filter,
+        sort,
+        expand: 'reported_by,requester,municipality',
+        requestKey: null,
+      })
+
+      // Atualiza cache de leitura local com dados frescos
+      if (scope) {
+        offlineDb.cacheEntities(scope, 'occurrences', records).catch(() => {})
+      }
+      return records
+    } catch (netErr) {
+      if (scope) {
+        const cached = await offlineDb.getCachedEntities<Occurrence>(scope, 'occurrences')
+        if (cached.length > 0) return cached
+      }
+      throw netErr
+    }
   },
   async get(id: string) {
     return pb.collection('occurrences').getOne<Occurrence>(id, {
@@ -181,8 +251,44 @@ export const occurrencesService = {
       requestKey: null,
     })
   },
-  async create(data: Partial<Occurrence>) {
-    return pb.collection('occurrences').create<Occurrence>(data)
+  async create(data: Partial<Occurrence>, agentName = 'Agente') {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      // Criação offline
+      const { tempRecord } = await offlineSyncManager.saveOccurrenceOffline(data, agentName)
+      return tempRecord
+    }
+
+    try {
+      const clientUuid = `occ_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+      const payload = {
+        ...data,
+        client_uuid: clientUuid,
+      }
+      const record = await pb.collection('occurrences').create<Occurrence>(payload)
+      const authUser = pb.authStore.record
+      if (authUser) {
+        offlineDb
+          .putSingleCachedEntity(
+            { userId: authUser.id, municipalityId: authUser.municipality || 'default' },
+            'occurrences',
+            record,
+          )
+          .catch(() => {})
+      }
+      return record
+    } catch (err) {
+      // Se falhar a rede no envio, enfileira offline
+      if (
+        typeof navigator !== 'undefined' &&
+        (!navigator.onLine ||
+          String(err).includes('Failed to fetch') ||
+          String(err).includes('NetworkError'))
+      ) {
+        const { tempRecord } = await offlineSyncManager.saveOccurrenceOffline(data, agentName)
+        return tempRecord
+      }
+      throw err
+    }
   },
   async update(id: string, data: Partial<Occurrence>) {
     return pb.collection('occurrences').update<Occurrence>(id, data)
@@ -192,14 +298,35 @@ export const occurrencesService = {
   },
 }
 
-// Requesters (Requerentes)
+// Requesters (Requerentes) com suporte a cache e offline
 export const requestersService = {
   async list(filter?: string, sort = 'name') {
-    return pb.collection('requesters').getFullList<Requester>({
-      filter,
-      sort,
-      requestKey: null,
-    })
+    const authUser = pb.authStore.record
+    const scope = authUser
+      ? { userId: authUser.id, municipalityId: authUser.municipality || 'default' }
+      : null
+
+    if (typeof navigator !== 'undefined' && !navigator.onLine && scope) {
+      return offlineDb.getCachedEntities<Requester>(scope, 'requesters')
+    }
+
+    try {
+      const records = await pb.collection('requesters').getFullList<Requester>({
+        filter,
+        sort,
+        requestKey: null,
+      })
+      if (scope) {
+        offlineDb.cacheEntities(scope, 'requesters', records).catch(() => {})
+      }
+      return records
+    } catch (err) {
+      if (scope) {
+        const cached = await offlineDb.getCachedEntities<Requester>(scope, 'requesters')
+        if (cached.length > 0) return cached
+      }
+      throw err
+    }
   },
   async get(id: string) {
     return pb.collection('requesters').getOne<Requester>(id, {
@@ -207,7 +334,26 @@ export const requestersService = {
     })
   },
   async create(data: Partial<Requester>) {
-    return pb.collection('requesters').create<Requester>(data)
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      const { tempRecord } = await offlineSyncManager.saveRequesterOffline(data)
+      return tempRecord
+    }
+    const clientUuid = `req_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    const record = await pb.collection('requesters').create<Requester>({
+      ...data,
+      client_uuid: clientUuid,
+    })
+    const authUser = pb.authStore.record
+    if (authUser) {
+      offlineDb
+        .putSingleCachedEntity(
+          { userId: authUser.id, municipalityId: authUser.municipality || 'default' },
+          'requesters',
+          record,
+        )
+        .catch(() => {})
+    }
+    return record
   },
   async update(id: string, data: Partial<Requester>) {
     return pb.collection('requesters').update<Requester>(id, data)

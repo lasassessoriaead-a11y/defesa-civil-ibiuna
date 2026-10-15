@@ -256,6 +256,33 @@ onRecordCreate((e) => {
   const status = record.getString('status') || 'rascunho'
   record.set('status', status)
 
+  // Idempotência por client_uuid
+  const clientUuid = record.getString('client_uuid')
+  if (clientUuid && munId) {
+    try {
+      const existing = $app.findFirstRecordByFilter(
+        'tree_authorizations',
+        "client_uuid = '" + clientUuid + "' && municipality = '" + munId + "'",
+      )
+      if (existing && existing.id) {
+        throw new BadRequestError(
+          'DUPLICATE_CLIENT_UUID:' + existing.id + ':' + (existing.getString('number') || ''),
+        )
+      }
+    } catch (findErr) {
+      if (findErr.message && findErr.message.indexOf('DUPLICATE_CLIENT_UUID') !== -1) {
+        throw findErr
+      }
+    }
+  }
+
+  // Se veio provisório
+  const currentNum = record.getString('number')
+  if (currentNum && currentNum.startsWith('OFF-') && !record.getString('prov_code')) {
+    record.set('prov_code', currentNum)
+    record.set('number', '')
+  }
+
   // Se já estiver sendo criada como emitida
   if (status === 'emitida') {
     // Validar emissor designado no backend
@@ -272,8 +299,10 @@ onRecordCreate((e) => {
       (!designatedIssuer && (userRole === 'administrador' || userRole === 'coordenador'))
 
     if (!isAuthorized) {
+      // Requisito 5: Se permissão foi revogada offline ou usuário sem permissão, NÃO emitir automaticamente
+      record.set('status', 'rascunho')
       throw new BadRequestError(
-        'Apenas o usuário designado pela Coordenadoria Municipal tem permissão para emitir autorizações de corte e poda.',
+        'Permissão não autorizada para emissão: apenas o usuário designado pela Coordenadoria Municipal pode emitir autorizações. O registro foi mantido como pendente/rascunho para regularização.',
       )
     }
 
