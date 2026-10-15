@@ -1,0 +1,51 @@
+{
+  "name": "Defesa Civil Municipal - Gestão de Desastres",
+  "short_name": "Defesa Civil",
+  "description": "Sistema de Gestão de Ocorrências e Monitoramento da Defesa Civil Municipal",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["government", "productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-icon-maskable.svg",
+      "sizes": "192x192 512x512 any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Painel",
+      "short_name": "Painel",
+      "description": "Visualizar mapa e ocorrências ativas",
+      "url": "/painel",
+      "icons": [{ "src": "/pwa-icon.svg", "sizes": "192x192", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Nova Ocorrência",
+      "short_name": "Ocorrências",
+      "description": "Acessar e registrar ocorrências",
+      "url": "/ocorrencias",
+      "icons": [{ "src": "/pwa-icon.svg", "sizes": "192x192", "type": "image/svg+xml" }]
+    },
+    {
+      "name": "Alertas",
+      "short_name": "Alertas",
+      "description": "Acessar alertas e avisos meteorológicos",
+      "url": "/alertas",
+      "icons": [{ "src": "/pwa-icon.svg", "sizes": "192x192", "type": "image/svg+xml" }]
+    }
+  ]
+}
