@@ -1,0 +1,122 @@
+{
+  "backupTimestamp": "2026-10-16T18:00:00.000Z",
+  "reason": "Backup pré-integração em massa dos 14 arquivos geográficos oficiais da Defesa Civil de Ibiúna (GPKG e KMZ)",
+  "municipality_target": {
+    "id": "cw9b6e2pqv89i3p",
+    "city": "Ibiúna",
+    "state": "SP",
+    "name": "Município Inicial"
+  },
+  "database_state_summary": {
+    "users": 2,
+    "occurrences": 3,
+    "occurrence_counters": 1,
+    "document_counters": 1,
+    "official_documents": 0,
+    "tree_authorizations": 0,
+    "teams": 1,
+    "risk_sectors": 290,
+    "danger_stretches": 202,
+    "strategic_infrastructures": 0,
+    "bridge_inspections": 0,
+    "external_demands": 0,
+    "geo_imports": 0,
+    "agent_profiles": 0,
+    "epi_items": 0,
+    "epi_deliveries": 0,
+    "shelters": 0,
+    "supplies": 0,
+    "alerts": 0,
+    "affected_areas": 0
+  },
+  "verified_operational_records": {
+    "users": [
+      {
+        "id": "yiph11qipwzepce",
+        "email": "luka2510@hotmail.com",
+        "name": "Defesa Civil Operador",
+        "role": "administrador",
+        "municipality": "cw9b6e2pqv89i3p",
+        "verified": true
+      },
+      {
+        "id": "rfeff9ia6sm78i0",
+        "email": "luis.gustavo@defesacivil.gov.br",
+        "name": "Luis Gustavo",
+        "role": "administrador",
+        "municipality": "cw9b6e2pqv89i3p",
+        "verified": true
+      }
+    ],
+    "occurrences": [
+      {
+        "id": "dvey2j1i4isys6f",
+        "code": "OC-2026-00001",
+        "title": "Alagamento",
+        "type": "enchente",
+        "severity": "media",
+        "status": "reportada",
+        "latitude": -23.54344,
+        "longitude": -46.62126,
+        "address": "Tu",
+        "municipality": "cw9b6e2pqv89i3p"
+      },
+      {
+        "id": "gfkunku1thbd5ld",
+        "code": "OC-2026-00002",
+        "title": "Aaaa",
+        "type": "enchente",
+        "severity": "alta",
+        "status": "reportada",
+        "latitude": -23.6603228,
+        "longitude": -47.2189188,
+        "address": "Rua Otávio Rosa ibiuna",
+        "municipality": "cw9b6e2pqv89i3p"
+      },
+      {
+        "id": "suxdyfwbd7fa4z8",
+        "code": "OC-2026-00003",
+        "title": "Enxurrada",
+        "type": "seca",
+        "severity": "alta",
+        "status": "reportada",
+        "latitude": 11.5118487,
+        "longitude": 104.9003821,
+        "address": "Rua",
+        "municipality": "cw9b6e2pqv89i3p"
+      }
+    ],
+    "occurrence_counters": [
+      {
+        "id": "am6kp5f9ynnt8xz",
+        "municipality": "cw9b6e2pqv89i3p",
+        "year": 2026,
+        "last_number": 3
+      }
+    ],
+    "document_counters": [
+      {
+        "id": "4ug0l1opj92i6jm",
+        "municipality": "cw9b6e2pqv89i3p",
+        "year": 2026,
+        "type": "autorizacao",
+        "last_number": 101
+      }
+    ],
+    "teams": [
+      {
+        "id": "ij5mjcogdzvini9",
+        "name": "Corpo De Bombeiros Ibiuna",
+        "type": "resgate",
+        "leader_name": "Capitao Cabral",
+        "member_count": 20,
+        "status": "em_operacao",
+        "current_occurrence": "gfkunku1thbd5ld",
+        "latitude": -23.6541589,
+        "longitude": -47.2051069,
+        "municipality": "cw9b6e2pqv89i3p"
+      }
+    ]
+  },
+  "reversion_procedure": "Caso seja necessária reversão de dados territoriais importados nesta etapa, aplicar a migração de rollback que remove os registros onde import_source referencia os arquivos GPKG/KMZ oficiais ou limpar a coleção territorial correspondente mantendo intactas as coleções operacionais users, occurrences, teams e counters."
+}

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-16T15:58:58.343Z",
+  "generatedAt": "2026-10-16T16:47:16.306Z",
   "collections": [
     {
       "name": "users",
@@ -1973,6 +1973,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "dedup_key",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -2160,6 +2166,12 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "dedup_key",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -3109,6 +3121,158 @@
       "indexes": [
         "CREATE INDEX idx_epi_del_mun_agent ON epi_deliveries (municipality, agent)",
         "CREATE INDEX idx_epi_del_date ON epi_deliveries (delivery_date DESC)"
+      ]
+    },
+    {
+      "name": "geo_layers",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "layer_type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "areas_inundacao",
+            "areas_avaliacao_risco",
+            "compdec_sedes",
+            "fotos_setores",
+            "hidro_principal",
+            "curva_nivel",
+            "nivel_atingimento",
+            "macrozoneamento_plano_diretor",
+            "limite_municipal_buffer",
+            "utb_territorial",
+            "cadev_historico",
+            "outros",
+            "setores_risco",
+            "trechos_perigo"
+          ]
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "feature_fid",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "source_file",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "risk_level",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "process_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "geometry_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "geometry_geojson",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "min_zoom",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "bbox_min_lat",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "bbox_max_lat",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "bbox_min_lon",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "bbox_max_lon",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "properties",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dedup_key",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_geo_layer_dedup ON geo_layers (municipality, dedup_key)",
+        "CREATE INDEX idx_geo_layer_mun_type ON geo_layers (municipality, layer_type)",
+        "CREATE INDEX idx_geo_layer_source ON geo_layers (municipality, source_file)",
+        "CREATE INDEX idx_geo_layer_code ON geo_layers (municipality, code)"
       ]
     }
   ]

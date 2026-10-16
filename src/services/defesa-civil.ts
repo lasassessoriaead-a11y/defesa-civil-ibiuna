@@ -948,3 +948,36 @@ export const epiDeliveriesService = {
     return pb.collection('epi_deliveries').delete(id)
   },
 }
+
+// ----------------------------------------------------------------------
+// Geo Layers Service (Camadas Espaciais Oficiais de Ibiúna)
+// ----------------------------------------------------------------------
+export const geoLayersService = {
+  async list(filter?: string, sort = 'name', limit = 1000) {
+    return pb.collection('geo_layers').getFullList({
+      filter,
+      sort,
+      batch: limit,
+      requestKey: null,
+    })
+  },
+  async get(id: string) {
+    return pb.collection('geo_layers').getOne(id, { requestKey: null })
+  },
+  async listByType(municipalityId: string, layerType: string) {
+    return pb.collection('geo_layers').getFullList({
+      filter: `municipality = "${municipalityId}" && layer_type = "${layerType}"`,
+      batch: 1000,
+      requestKey: null,
+    })
+  },
+  async create(data: any) {
+    return pb.collection('geo_layers').create(data)
+  },
+  async update(id: string, data: any) {
+    return pb.collection('geo_layers').update(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('geo_layers').delete(id)
+  },
+}

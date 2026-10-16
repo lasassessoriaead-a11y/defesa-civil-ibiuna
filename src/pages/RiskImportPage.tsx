@@ -15,7 +15,15 @@ import {
   FileCheck,
   Building,
   Info,
+  Globe2,
+  Download,
 } from 'lucide-react'
+import {
+  geoOfficialImporterService,
+  OFFICIAL_GEO_FILES,
+  type ImportProgress,
+  type FileImportResult,
+} from '@/services/geo-official-importer-service'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -60,7 +68,64 @@ export const RiskImportPage: React.FC = () => {
     'all' | 'sectors' | 'stretches' | 'totalizers' | 'rejected'
   >('all')
 
+  // Estado do painel de importação dos 14 Arquivos Oficiais GPKG/KMZ
+  const [isOfficialGeoImporting, setIsOfficialGeoImporting] = useState(false)
+  const [officialGeoProgressList, setOfficialGeoProgressList] = useState<
+    Record<string, ImportProgress>
+  >({})
+  const [officialGeoResults, setOfficialGeoResults] = useState<FileImportResult[]>([])
+  const [isPriorityOnly, setIsPriorityOnly] = useState(false)
+
   const municipalityId = user?.municipality || ''
+
+  const handleImportOfficialGeoFiles = async (priorityOnly = false) => {
+    if (!municipalityId) {
+      toast({
+        variant: 'destructive',
+        title: 'Município não identificado',
+        description: 'Faça login com um operador associado a Ibiúna para continuar.',
+      })
+      return
+    }
+
+    setIsOfficialGeoImporting(true)
+    setIsPriorityOnly(priorityOnly)
+    setOfficialGeoResults([])
+
+    try {
+      toast({
+        title: 'Iniciando Importação dos Arquivos Geográficos',
+        description: `Processando os arquivos oficiais de Ibiúna com conversão SIRGAS 2000 -> WGS84 e idempotência.`,
+      })
+
+      const results = await geoOfficialImporterService.importAllOfficialFiles(
+        municipalityId,
+        (progress) => {
+          setOfficialGeoProgressList((prev) => ({
+            ...prev,
+            [progress.fileId]: progress,
+          }))
+        },
+        priorityOnly,
+      )
+
+      setOfficialGeoResults(results)
+      const successCount = results.filter((r) => r.status === 'sucesso').length
+      toast({
+        title: 'Processamento Geográfico Concluído',
+        description: `${successCount} arquivo(s) importados com sucesso para o banco de dados e mapa.`,
+      })
+      loadBatches()
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro na importação geográfica',
+        description: err.message || 'Falha ao processar repositório.',
+      })
+    } finally {
+      setIsOfficialGeoImporting(false)
+    }
+  }
 
   // Carregar histórico de auditoria de lotes de importação
   const loadBatches = async () => {
@@ -257,6 +322,142 @@ export const RiskImportPage: React.FC = () => {
           </Badge>
         </div>
       </div>
+
+      {/* PAINEL DOS 14 ARQUIVOS GEOGRÁFICOS OFICIAIS (GPKG / KMZ) */}
+      <Card className="border-blue-200 bg-gradient-to-b from-blue-50/50 to-white shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-base flex items-center gap-2 text-blue-950 font-bold">
+                <Globe2 className="w-5 h-5 text-blue-600" />
+                Arquivos Geográficos Oficiais de Ibiúna (14 Arquivos GPKG / KMZ)
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-600 mt-1">
+                Importação em lote do repositório público oficial com conversão de EPSG:31983 para
+                EPSG:4326, armazenamento em{' '}
+                <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-800">geo_layers</code>,
+                conciliação e renderização no mapa.
+              </CardDescription>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleImportOfficialGeoFiles(true)}
+                disabled={isOfficialGeoImporting}
+                className="bg-white hover:bg-blue-50 border-blue-200 text-blue-700 text-xs font-semibold"
+              >
+                <Layers className="w-3.5 h-3.5 mr-1" />
+                Importar 4 Camadas Prioritárias
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => handleImportOfficialGeoFiles(false)}
+                disabled={isOfficialGeoImporting}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm"
+              >
+                {isOfficialGeoImporting ? (
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
+                    Processando...
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-3.5 h-3.5 mr-1" />
+                    Importar Todos os 14 Arquivos
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+            <Table>
+              <TableHeader className="bg-slate-50 text-[11px]">
+                <TableRow>
+                  <TableHead>Arquivo</TableHead>
+                  <TableHead>Finalidade / Descrição</TableHead>
+                  <TableHead className="w-24">Tamanho</TableHead>
+                  <TableHead className="w-28">Prioridade</TableHead>
+                  <TableHead className="w-48">Status / Progresso</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody className="text-xs">
+                {OFFICIAL_GEO_FILES.map((f) => {
+                  const progress = officialGeoProgressList[f.id]
+                  return (
+                    <TableRow key={f.id} className="hover:bg-slate-50/70">
+                      <TableCell className="font-semibold text-slate-900 font-mono text-[11px]">
+                        {f.filename}
+                      </TableCell>
+                      <TableCell className="text-slate-600 text-xs">{f.description}</TableCell>
+                      <TableCell className="text-slate-500 font-mono text-[11px]">
+                        {f.sizeApprox}
+                      </TableCell>
+                      <TableCell>
+                        {f.isPriority ? (
+                          <Badge className="bg-amber-500 text-white text-[10px]">Prioritária</Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-slate-500 text-[10px]">
+                            Contexto
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {!progress ? (
+                          <span className="text-slate-400 text-[11px]">Pronto para carga</span>
+                        ) : progress.status === 'completed' ? (
+                          <div className="flex items-center gap-1.5 text-emerald-600 font-semibold text-[11px]">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>{progress.importedCount || 0} feições gravadas</span>
+                          </div>
+                        ) : progress.status === 'error' ? (
+                          <div className="flex items-center gap-1 text-red-600 text-[11px]">
+                            <XCircle className="w-3.5 h-3.5" />
+                            <span className="truncate max-w-[140px]" title={progress.error}>
+                              {progress.error}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            <div className="flex items-center gap-1.5 text-blue-600 text-[11px]">
+                              <RefreshCw className="w-3 h-3 animate-spin" />
+                              <span className="truncate max-w-[140px]">{progress.currentStep}</span>
+                            </div>
+                            {progress.totalRecords && progress.importedCount ? (
+                              <Progress
+                                value={Math.round(
+                                  (progress.importedCount / progress.totalRecords) * 100,
+                                )}
+                                className="h-1.5 bg-blue-100"
+                              />
+                            ) : null}
+                          </div>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-start gap-2">
+            <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <strong>Observação importante sobre pendências:</strong> O arquivo{' '}
+              <code>UTB_Ibiuna_500m_final.gpkg</code> citado pelo usuário não existe no repositório
+              GitHub oficial (foi utilizado o arquivo existente correspondente{' '}
+              <code>UTB_geometria_corrigida_FINAL.gpkg</code>). As 956 ocorrências históricas
+              continuam preservadas e não foram importadas, respeitando a autorização expressa do
+              usuário.
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Upload Zone & Instructions */}
       <Card className="border-slate-200 shadow-sm">

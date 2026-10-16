@@ -307,7 +307,57 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [showAreas, setShowAreas] = useState(true)
   const [showShelters, setShowShelters] = useState(true)
   const [showTeams, setShowTeams] = useState(true)
+  const [showRiskSectorsGeo, setShowRiskSectorsGeo] = useState(true)
+  const [showDangerStretchesGeo, setShowDangerStretchesGeo] = useState(true)
+  const [showInundationGeo, setShowInundationGeo] = useState(true)
+  const [showHydroGeo, setShowHydroGeo] = useState(true)
+  const [showMacroGeo, setShowMacroGeo] = useState(false)
+  const [showContoursGeo, setShowContoursGeo] = useState(false)
+  const [showUtbGeo, setShowUtbGeo] = useState(false)
+  const [showPhotosGeo, setShowPhotosGeo] = useState(false)
+  const [showCadEvGeo, setShowCadEvGeo] = useState(false)
+  const [riskFilter, setRiskFilter] = useState<'all' | 'R1' | 'R2' | 'R3' | 'R4'>('all')
 
+  // Camadas dinâmicas do banco de dados (geo_layers e geometrias de risk_sectors/danger_stretches)
+  const [loadedGeoLayers, setLoadedGeoLayers] = useState<any[]>([])
+  const [geoRiskSectors, setGeoRiskSectors] = useState<any[]>([])
+  const [geoDangerStretches, setGeoDangerStretches] = useState<any[]>([])
+  const [currentZoom, setCurrentZoom] = useState(zoom)
+
+  useEffect(() => {
+    let isMounted = true
+    async function fetchGeometries() {
+      try {
+        const [layersRes, sectorsRes, stretchesRes] = await Promise.all([
+          (window as any).pb
+            ?.collection('geo_layers')
+            ?.getFullList({ batch: 1000, requestKey: null }) || Promise.resolve([]),
+          (window as any).pb?.collection('risk_sectors')?.getFullList({
+            filter: 'geometry_geojson != ""',
+            batch: 500,
+            requestKey: null,
+          }) || Promise.resolve([]),
+          (window as any).pb?.collection('danger_stretches')?.getFullList({
+            filter: 'geometry_geojson != ""',
+            batch: 500,
+            requestKey: null,
+          }) || Promise.resolve([]),
+        ])
+
+        if (isMounted) {
+          setLoadedGeoLayers(layersRes || [])
+          setGeoRiskSectors(sectorsRes || [])
+          setGeoDangerStretches(stretchesRes || [])
+        }
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+    fetchGeometries()
+    return () => {
+      isMounted = false
+    }
+  }, [])
   // Validate initial center
   const validCenter: [number, number] = useMemo(() => {
     if (
@@ -651,6 +701,266 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             )
           })}
 
+        {/* Render Setores de Risco Oficiais (Polígonos coloridos por R1-R4) */}
+        {showRiskSectorsGeo &&
+          loadedGeoLayers
+            .filter(
+              (l) => l.layer_type === 'setores_risco' || l.layer_type === 'areas_avaliacao_risco',
+            )
+            .filter((l) => riskFilter === 'all' || l.risk_level === riskFilter)
+            .map((layer) => {
+              if (!layer.geometry_geojson) return null
+              try {
+                const geom = JSON.parse(layer.geometry_geojson)
+                let positions: any = []
+                if (geom.type === 'Polygon') {
+                  positions = geom.coordinates.map((ring: any[]) =>
+                    ring.map((pt: any[]) => [pt[1], pt[0]]),
+                  )
+                } else if (geom.type === 'MultiPolygon') {
+                  positions = geom.coordinates.map((poly: any[]) =>
+                    poly.map((ring: any[]) => ring.map((pt: any[]) => [pt[1], pt[0]])),
+                  )
+                } else {
+                  return null
+                }
+
+                const rLevel = layer.risk_level || 'R2'
+                let color = '#d97706'
+                let fillColor = '#f59e0b'
+                if (rLevel === 'R4') {
+                  color = '#b91c1c'
+                  fillColor = '#ef4444'
+                } else if (rLevel === 'R3') {
+                  color = '#ea580c'
+                  fillColor = '#f97316'
+                } else if (rLevel === 'R1') {
+                  color = '#059669'
+                  fillColor = '#10b981'
+                }
+
+                return (
+                  <Polygon
+                    key={layer.id}
+                    positions={positions}
+                    pathOptions={{
+                      color,
+                      fillColor,
+                      fillOpacity: 0.45,
+                      weight: 2,
+                    }}
+                  >
+                    <Popup>
+                      <div className="p-1 min-w-[220px] text-xs space-y-1">
+                        <div className="flex items-center justify-between border-b pb-1 font-bold">
+                          <span className="text-slate-900">{layer.name || layer.code}</span>
+                          <span
+                            className={`px-1.5 py-0.5 rounded text-[10px] text-white font-bold ${
+                              rLevel === 'R4'
+                                ? 'bg-red-600'
+                                : rLevel === 'R3'
+                                  ? 'bg-orange-500'
+                                  : rLevel === 'R2'
+                                    ? 'bg-amber-500'
+                                    : 'bg-emerald-600'
+                            }`}
+                          >
+                            {rLevel}
+                          </span>
+                        </div>
+                        <p className="text-slate-600">
+                          <strong>Código:</strong> {layer.code || '-'}
+                        </p>
+                        <p className="text-slate-600">
+                          <strong>Processo:</strong>{' '}
+                          {layer.process_type || 'Escorregamento/Enxurrada'}
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          <strong>Fonte:</strong> {layer.source_file}
+                        </p>
+                      </div>
+                    </Popup>
+                  </Polygon>
+                )
+              } catch (_) {
+                return null
+              }
+            })}
+
+        {/* Render Trechos de Perigo Oficiais (Linhas com rótulo) */}
+        {showDangerStretchesGeo &&
+          loadedGeoLayers
+            .filter((l) => l.layer_type === 'trechos_perigo')
+            .filter((l) => riskFilter === 'all' || l.risk_level === riskFilter)
+            .map((layer) => {
+              if (!layer.geometry_geojson) return null
+              try {
+                const geom = JSON.parse(layer.geometry_geojson)
+                let positions: any = []
+                if (geom.type === 'LineString') {
+                  positions = geom.coordinates.map((pt: any[]) => [pt[1], pt[0]])
+                } else if (geom.type === 'MultiLineString') {
+                  positions = geom.coordinates.map((line: any[]) =>
+                    line.map((pt: any[]) => [pt[1], pt[0]]),
+                  )
+                } else {
+                  return null
+                }
+
+                const rLevel = layer.risk_level || 'R3'
+                const color = rLevel === 'R4' ? '#dc2626' : rLevel === 'R3' ? '#ea580c' : '#d97706'
+
+                return (
+                  <Polyline
+                    key={layer.id}
+                    positions={positions}
+                    pathOptions={{
+                      color,
+                      weight: 4,
+                      opacity: 0.85,
+                    }}
+                  >
+                    <Popup>
+                      <div className="p-1 min-w-[200px] text-xs space-y-1">
+                        <div className="flex items-center justify-between border-b pb-1 font-bold">
+                          <span className="text-slate-900">{layer.name || layer.code}</span>
+                          <span className="text-orange-600 font-bold">{rLevel}</span>
+                        </div>
+                        <p className="text-slate-600">
+                          <strong>Trecho:</strong> {layer.code}
+                        </p>
+                        <p className="text-[10px] text-slate-500">
+                          <strong>Fonte:</strong> {layer.source_file}
+                        </p>
+                      </div>
+                    </Popup>
+                  </Polyline>
+                )
+              } catch (_) {
+                return null
+              }
+            })}
+
+        {/* Render Áreas de Inundação Oficial */}
+        {showInundationGeo &&
+          loadedGeoLayers
+            .filter((l) => l.layer_type === 'areas_inundacao')
+            .map((layer) => {
+              if (!layer.geometry_geojson) return null
+              try {
+                const geom = JSON.parse(layer.geometry_geojson)
+                let positions: any = []
+                if (geom.type === 'Polygon') {
+                  positions = geom.coordinates.map((ring: any[]) =>
+                    ring.map((pt: any[]) => [pt[1], pt[0]]),
+                  )
+                } else if (geom.type === 'MultiPolygon') {
+                  positions = geom.coordinates.map((poly: any[]) =>
+                    poly.map((ring: any[]) => ring.map((pt: any[]) => [pt[1], pt[0]])),
+                  )
+                } else {
+                  return null
+                }
+
+                return (
+                  <Polygon
+                    key={layer.id}
+                    positions={positions}
+                    pathOptions={{
+                      color: '#0284c7',
+                      fillColor: '#38bdf8',
+                      fillOpacity: 0.5,
+                      weight: 2,
+                    }}
+                  >
+                    <Popup>
+                      <div className="p-1 min-w-[200px] text-xs space-y-1">
+                        <div className="flex items-center gap-1.5 font-bold text-sky-900 border-b pb-1">
+                          <span>Área de Inundação: {layer.name}</span>
+                        </div>
+                        <p className="text-slate-600">Risco hídrico mapeado em Ibiúna</p>
+                        <p className="text-[10px] text-slate-500">Fonte: {layer.source_file}</p>
+                      </div>
+                    </Popup>
+                  </Polygon>
+                )
+              } catch (_) {
+                return null
+              }
+            })}
+
+        {/* Render Hidrografia Principal */}
+        {showHydroGeo &&
+          loadedGeoLayers
+            .filter((l) => l.layer_type === 'hidro_principal')
+            .map((layer) => {
+              if (!layer.geometry_geojson) return null
+              try {
+                const geom = JSON.parse(layer.geometry_geojson)
+                let positions: any = []
+                if (geom.type === 'LineString') {
+                  positions = geom.coordinates.map((pt: any[]) => [pt[1], pt[0]])
+                } else if (geom.type === 'MultiLineString') {
+                  positions = geom.coordinates.map((line: any[]) =>
+                    line.map((pt: any[]) => [pt[1], pt[0]]),
+                  )
+                } else {
+                  return null
+                }
+
+                return (
+                  <Polyline
+                    key={layer.id}
+                    positions={positions}
+                    pathOptions={{
+                      color: '#2563eb',
+                      weight: 2.5,
+                      opacity: 0.75,
+                    }}
+                  >
+                    <Popup>
+                      <div className="p-1 text-xs">
+                        <strong>Hidrografia:</strong> {layer.name || 'Rio/Córrego'}
+                      </div>
+                    </Popup>
+                  </Polyline>
+                )
+              } catch (_) {
+                return null
+              }
+            })}
+
+        {/* Render Curvas de Nível (Topografia com Zoom >= 14) */}
+        {showContoursGeo &&
+          loadedGeoLayers
+            .filter((l) => l.layer_type === 'curva_nivel')
+            .slice(0, 300)
+            .map((layer) => {
+              if (!layer.geometry_geojson) return null
+              try {
+                const geom = JSON.parse(layer.geometry_geojson)
+                if (geom.type !== 'LineString' && geom.type !== 'MultiLineString') return null
+                const positions =
+                  geom.type === 'LineString'
+                    ? geom.coordinates.map((pt: any[]) => [pt[1], pt[0]])
+                    : geom.coordinates.map((line: any[]) => line.map((pt: any[]) => [pt[1], pt[0]]))
+
+                return (
+                  <Polyline
+                    key={layer.id}
+                    positions={positions}
+                    pathOptions={{
+                      color: '#a8a29e',
+                      weight: 1,
+                      opacity: 0.6,
+                    }}
+                  />
+                )
+              } catch (_) {
+                return null
+              }
+            })}
+
         {/* Render Interactively Picked Pin Marker */}
         {pickedCoordinate &&
           pickedCoordinate.lat !== undefined &&
@@ -736,6 +1046,110 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               <Users className="w-3.5 h-3.5 mr-1 text-purple-600" />
               Equipes ({teams.length})
             </Button>
+
+            {/* Alternadores das Novas Camadas Oficiais de Ibiúna */}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowRiskSectorsGeo(!showRiskSectorsGeo)}
+              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                showRiskSectorsGeo
+                  ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5 mr-1 text-orange-600" />
+              Setores GPKG (
+              {
+                loadedGeoLayers.filter(
+                  (l) =>
+                    l.layer_type === 'setores_risco' || l.layer_type === 'areas_avaliacao_risco',
+                ).length
+              }
+              )
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowDangerStretchesGeo(!showDangerStretchesGeo)}
+              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                showDangerStretchesGeo
+                  ? 'bg-red-100 text-red-800 border border-red-300'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Navigation className="w-3.5 h-3.5 mr-1 text-red-600" />
+              Trechos GPKG (
+              {loadedGeoLayers.filter((l) => l.layer_type === 'trechos_perigo').length})
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowInundationGeo(!showInundationGeo)}
+              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                showInundationGeo
+                  ? 'bg-sky-100 text-sky-800 border border-sky-300'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Inundação ({loadedGeoLayers.filter((l) => l.layer_type === 'areas_inundacao').length})
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowHydroGeo(!showHydroGeo)}
+              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                showHydroGeo
+                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Hidrografia (
+              {loadedGeoLayers.filter((l) => l.layer_type === 'hidro_principal').length})
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowContoursGeo(!showContoursGeo)}
+              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                showContoursGeo
+                  ? 'bg-stone-200 text-stone-800 border border-stone-400'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              Curvas de Nível
+            </Button>
+          </div>
+
+          {/* Filtro R1-R4 */}
+          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-md px-2 py-1 rounded-lg border border-slate-300 shadow-md text-xs">
+            <span className="font-semibold text-slate-600 mr-1">Grau:</span>
+            {(['all', 'R4', 'R3', 'R2', 'R1'] as const).map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRiskFilter(r)}
+                className={`px-1.5 py-0.5 rounded text-[11px] font-bold transition-all ${
+                  riskFilter === r
+                    ? r === 'R4'
+                      ? 'bg-red-600 text-white'
+                      : r === 'R3'
+                        ? 'bg-orange-500 text-white'
+                        : r === 'R2'
+                          ? 'bg-amber-500 text-white'
+                          : r === 'R1'
+                            ? 'bg-emerald-600 text-white'
+                            : 'bg-slate-800 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                {r === 'all' ? 'Todos' : r}
+              </button>
+            ))}
           </div>
         </div>
       )}
