@@ -15,6 +15,7 @@ import { AssistantPage } from '@/pages/AssistantPage'
 import { RequestersPage } from '@/pages/RequestersPage'
 import { AuditLogPage } from '@/pages/AuditLogPage'
 import { UsersManagementPage } from '@/pages/UsersManagementPage'
+import { AgentProfilesPage } from '@/pages/AgentProfilesPage'
 import { OfficialDocumentsPage } from '@/pages/OfficialDocumentsPage'
 import { TreeAuthorizationsPage } from '@/pages/TreeAuthorizationsPage'
 import { ReportsPage } from '@/pages/ReportsPage'
@@ -118,7 +119,8 @@ export const App: React.FC = () => {
             <Route path="/relatorios" element={<ReportsPage />} />
             <Route path="/requerentes" element={<RequestersPage />} />
             <Route path="/auditoria" element={<AuditLogPage />} />
-            <Route path="/usuarios" element={<UsersManagementPage />} />{' '}
+            <Route path="/usuarios" element={<UsersManagementPage />} />
+            <Route path="/agentes-epi" element={<AgentProfilesPage />} />
           </Route>
 
           {/* 404 Fallback */}

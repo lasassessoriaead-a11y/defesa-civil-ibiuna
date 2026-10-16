@@ -690,6 +690,20 @@ export const OccurrencesPage: React.FC = () => {
       return
     }
 
+    // Regra histórica aprovada (Documento Mestre ContekOne -> Skip):
+    // Quando o tipo for 'outro', a descrição do evento deve ter entre 9 e 30 caracteres
+    if (formData.type === 'outro') {
+      const descLen = (formData.other_type_description || '').trim().length
+      if (descLen < 9 || descLen > 30) {
+        toast({
+          variant: 'destructive',
+          title: 'Validação de tipo "Outros"',
+          description: `A descrição do tipo de ocorrência deve conter entre 9 e 30 caracteres (atualmente com ${descLen} caracteres).`,
+        })
+        return
+      }
+    }
+
     try {
       // Montar endereço composto se o usuário preencheu campos separados
       let fullAddr = formData.address?.trim()

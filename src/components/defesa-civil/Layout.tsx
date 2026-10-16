@@ -67,6 +67,7 @@ const navItems: NavItem[] = [
   { title: 'WhatsApp', href: '/whatsapp', icon: MessageSquare },
   { title: 'Áreas Afetadas', href: '/areas-afetadas', icon: Map },
   { title: 'Requerentes', href: '/requerentes', icon: Users },
+  { title: 'Agentes & EPIs', href: '/agentes-epi', icon: ShieldAlert },
   { title: 'Auditoria', href: '/auditoria', icon: Shield },
   { title: 'Usuários', href: '/usuarios', icon: UserCheck },
   { title: 'Assistente IA', href: '/assistente', icon: Bot },

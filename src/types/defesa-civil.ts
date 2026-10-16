@@ -300,6 +300,95 @@ export interface BridgeInspection extends RecordModel {
 }
 
 // ---------------------------------------------
+// AGENTES, UNIFORMES E CONTROLE DE EPI (Documento Mestre Requisitos)
+// ---------------------------------------------
+
+export type AgentStatus = 'ativo' | 'afastado' | 'ferias' | 'desligado'
+export type EmploymentType = 'concursado' | 'comissionado' | 'temporario' | 'voluntario' | 'outro'
+
+export interface AgentProfile extends RecordModel {
+  municipality: string
+  user: string
+  registration_number?: string
+  full_name: string
+  cpf?: string
+  rg?: string
+  blood_type?: string
+  emergency_contact?: string
+  emergency_phone?: string
+  admission_date?: string
+  employment_type?: EmploymentType
+  operational_role?: string
+  status: AgentStatus
+  // Medidas de Uniforme e Vestuário
+  tshirt_size?: string
+  shirt_size?: string
+  pants_size?: string
+  jacket_size?: string
+  boot_size?: string
+  additional_measurements?: string
+  notes?: string
+  expand?: {
+    user?: User
+    municipality?: Municipality
+  }
+}
+
+export type EpiCategory =
+  | 'epi_cabeca'
+  | 'epi_respiratorio'
+  | 'epi_maos'
+  | 'epi_pes'
+  | 'uniforme'
+  | 'altura_resgate'
+  | 'aquatico'
+  | 'outro'
+
+export interface EpiItem extends RecordModel {
+  municipality: string
+  name: string
+  category: EpiCategory
+  ca_number?: string
+  specification?: string
+  size?: string
+  stock_quantity: number
+  min_stock_alert?: number
+  unit?: string
+  required_for_roles?: string
+  is_active: boolean
+}
+
+export type EpiDeliveryAction =
+  | 'entrega_inicial'
+  | 'substituicao_desgaste'
+  | 'substituicao_dano'
+  | 'devolucao_baixa'
+  | 'emprestimo_temporario'
+
+export interface EpiDelivery extends RecordModel {
+  municipality: string
+  agent: string
+  item: string
+  action_type: EpiDeliveryAction
+  quantity: number
+  delivery_date: string
+  item_size?: string
+  item_specification?: string
+  reason?: string
+  receipt_signed: boolean
+  receipt_signature_date?: string
+  receipt_document_number?: string
+  delivered_by?: string
+  delivered_by_name?: string
+  notes?: string
+  expand?: {
+    agent?: User
+    item?: EpiItem
+    delivered_by?: User
+  }
+}
+
+// ---------------------------------------------
 // Demandas para Outras Secretarias
 // ---------------------------------------------
 export type TargetDepartment =

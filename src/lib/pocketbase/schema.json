@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-16T15:28:57.195Z",
+  "generatedAt": "2026-10-16T15:58:58.343Z",
   "collections": [
     {
       "name": "users",
@@ -2718,6 +2718,398 @@
         }
       ],
       "indexes": ["CREATE INDEX idx_geo_imp_mun_date ON geo_imports (municipality, created DESC)"]
+    },
+    {
+      "name": "agent_profiles",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality && (user = @request.auth.id || @request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "user",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "registration_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "full_name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "cpf",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "rg",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "blood_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "emergency_contact",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "emergency_phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "admission_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "employment_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["concursado", "comissionado", "temporario", "voluntario", "outro"]
+        },
+        {
+          "name": "operational_role",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["ativo", "afastado", "ferias", "desligado"]
+        },
+        {
+          "name": "tshirt_size",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "shirt_size",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pants_size",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "jacket_size",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "boot_size",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "additional_measurements",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_agent_prof_user ON agent_profiles (user)",
+        "CREATE INDEX idx_agent_prof_mun_status ON agent_profiles (municipality, status)"
+      ]
+    },
+    {
+      "name": "epi_items",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "category",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "epi_cabeca",
+            "epi_respiratorio",
+            "epi_maos",
+            "epi_pes",
+            "uniforme",
+            "altura_resgate",
+            "aquatico",
+            "outro"
+          ]
+        },
+        {
+          "name": "ca_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "specification",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "size",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "stock_quantity",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "min_stock_alert",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "unit",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "required_for_roles",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_epi_mun_cat ON epi_items (municipality, category)"]
+    },
+    {
+      "name": "epi_deliveries",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "agent",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "item",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "epi_items"
+        },
+        {
+          "name": "action_type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "entrega_inicial",
+            "substituicao_desgaste",
+            "substituicao_dano",
+            "devolucao_baixa",
+            "emprestimo_temporario"
+          ]
+        },
+        {
+          "name": "quantity",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "delivery_date",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "item_size",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "item_specification",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "reason",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "receipt_signed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "receipt_signature_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "receipt_document_number",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "delivered_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "delivered_by_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_epi_del_mun_agent ON epi_deliveries (municipality, agent)",
+        "CREATE INDEX idx_epi_del_date ON epi_deliveries (delivery_date DESC)"
+      ]
     }
   ]
 }

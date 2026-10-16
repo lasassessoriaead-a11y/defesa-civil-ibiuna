@@ -1,0 +1,160 @@
+{
+  "backupTimestamp": "2026-10-18T16:00:00.000Z",
+  "reason": "Auditoria ContekOne -> Skip v1.0 e Complementação Integral (Agentes/EPIs e Contador 102 de AUT)",
+  "metadata": {
+    "version": "v0.0.21",
+    "target": "v1.0.0",
+    "database": "PocketBase v0.36 Skip Cloud"
+  },
+  "collections": {
+    "users": [
+      {
+        "id": "yiph11qipwzepce",
+        "email": "luka2510@hotmail.com",
+        "name": "Defesa Civil Operador",
+        "role": "administrador",
+        "municipality": "cw9b6e2pqv89i3p",
+        "created": "2026-08-19 08:56:04.134Z",
+        "updated": "2026-08-19 08:56:04.134Z",
+        "verified": true
+      },
+      {
+        "id": "rfeff9ia6sm78i0",
+        "email": "luis.gustavo@defesacivil.gov.br",
+        "name": "Luis Gustavo",
+        "role": "administrador",
+        "municipality": "cw9b6e2pqv89i3p",
+        "created": "2026-08-19 20:43:36.396Z",
+        "updated": "2026-08-19 20:43:36.396Z",
+        "verified": true
+      }
+    ],
+    "municipalities": [
+      {
+        "id": "cw9b6e2pqv89i3p",
+        "name": "Município Inicial",
+        "city": "Ibiúna",
+        "state": "SP",
+        "logo": "",
+        "doc_header": "PREFEITURA MUNICIPAL - COORDENADORIA MUNICIPAL DE DEFESA CIVIL",
+        "doc_footer": "Defesa Civil Municipal — Atendimento de Emergência 199",
+        "authorized_issuer": "",
+        "created": "2026-10-15 16:15:40.753Z",
+        "updated": "2026-10-15 16:15:40.753Z"
+      }
+    ],
+    "occurrences": [
+      {
+        "id": "dvey2j1i4isys6f",
+        "code": "OC-2026-00001",
+        "title": "Alagamento",
+        "description": "",
+        "type": "enchente",
+        "severity": "media",
+        "status": "reportada",
+        "latitude": -23.54344,
+        "longitude": -46.62126,
+        "address": "Tu",
+        "affectable_population": 50,
+        "origin": "199",
+        "municipality": "cw9b6e2pqv89i3p",
+        "reported_by": "yiph11qipwzepce",
+        "resolved_at": "",
+        "created": "2026-08-20 13:47:29.837Z",
+        "updated": "2026-10-15 16:15:40.808Z"
+      },
+      {
+        "id": "gfkunku1thbd5ld",
+        "code": "OC-2026-00002",
+        "title": "Aaaa",
+        "description": "Poo",
+        "type": "enchente",
+        "severity": "alta",
+        "status": "reportada",
+        "latitude": -23.6603228,
+        "longitude": -47.2189188,
+        "address": "Rua Otávio Rosa ibiuna",
+        "affectable_population": 50,
+        "origin": "199",
+        "municipality": "cw9b6e2pqv89i3p",
+        "reported_by": "yiph11qipwzepce",
+        "resolved_at": "",
+        "created": "2026-08-20 13:47:51.664Z",
+        "updated": "2026-10-15 16:15:40.808Z"
+      },
+      {
+        "id": "suxdyfwbd7fa4z8",
+        "code": "OC-2026-00003",
+        "title": "Enxurrada",
+        "description": "",
+        "type": "seca",
+        "severity": "alta",
+        "status": "reportada",
+        "latitude": 11.5118487,
+        "longitude": 104.9003821,
+        "address": "Rua",
+        "affectable_population": 50,
+        "origin": "199",
+        "municipality": "cw9b6e2pqv89i3p",
+        "reported_by": "yiph11qipwzepce",
+        "resolved_at": "",
+        "created": "2026-10-15 16:01:22.897Z",
+        "updated": "2026-10-15 16:15:40.808Z"
+      }
+    ],
+    "occurrence_counters": [
+      {
+        "id": "am6kp5f9ynnt8xz",
+        "municipality": "cw9b6e2pqv89i3p",
+        "year": 2026,
+        "last_number": 3,
+        "created": "2026-10-15 16:15:40.809Z",
+        "updated": "2026-10-15 16:15:40.809Z"
+      }
+    ],
+    "tree_authorizations": [],
+    "document_counters": [],
+    "official_documents": [],
+    "doc_templates": [
+      {
+        "id": "w917t6psrjv1g4l",
+        "municipality": "cw9b6e2pqv89i3p",
+        "title": "Ofício de Solicitação Padrão",
+        "category": "solicitacao",
+        "subject": "Solicitação de apoio institucional em ações preventivas",
+        "is_default": true,
+        "created_by": "yiph11qipwzepce"
+      },
+      {
+        "id": "5y0kefmlnajxn9y",
+        "municipality": "cw9b6e2pqv89i3p",
+        "title": "Ofício de Notificação Preventiva",
+        "category": "notificacao",
+        "subject": "Notificação de risco iminente e orientações preventivas",
+        "is_default": false,
+        "created_by": "yiph11qipwzepce"
+      }
+    ],
+    "teams": [
+      {
+        "id": "ij5mjcogdzvini9",
+        "name": "Corpo De Bombeiros Ibiuna",
+        "type": "resgate",
+        "leader_name": "Capitao Cabral",
+        "member_count": 20,
+        "status": "em_operacao",
+        "current_occurrence": "gfkunku1thbd5ld",
+        "municipality": "cw9b6e2pqv89i3p",
+        "latitude": -23.6541589,
+        "longitude": -47.2051069
+      }
+    ],
+    "risk_sectors": [],
+    "danger_stretches": [],
+    "strategic_infrastructures": [],
+    "bridge_inspections": [],
+    "external_demands": [],
+    "geo_imports": [],
+    "audit_log": []
+  }
+}

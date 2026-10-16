@@ -835,3 +835,116 @@ export const geoImportsService = {
     return pb.collection('geo_imports').create<import('@/types/defesa-civil').GeoImportBatch>(data)
   },
 }
+
+// ----------------------------------------------------------------------
+// Agent Profiles Service (Ficha Funcional, Medidas e Uniformes)
+// ----------------------------------------------------------------------
+export const agentProfilesService = {
+  async list(filter?: string, sort = 'full_name') {
+    return pb
+      .collection('agent_profiles')
+      .getFullList<import('@/types/defesa-civil').AgentProfile>({
+        filter,
+        sort,
+        expand: 'user,municipality',
+        requestKey: null,
+      })
+  },
+  async getByUserId(userId: string) {
+    try {
+      const records = await pb
+        .collection('agent_profiles')
+        .getList<import('@/types/defesa-civil').AgentProfile>(1, 1, {
+          filter: `user = "${userId}"`,
+          expand: 'user,municipality',
+          requestKey: null,
+        })
+      return records.items[0] || null
+    } catch {
+      return null
+    }
+  },
+  async get(id: string) {
+    return pb.collection('agent_profiles').getOne<import('@/types/defesa-civil').AgentProfile>(id, {
+      expand: 'user,municipality',
+      requestKey: null,
+    })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').AgentProfile>) {
+    return pb.collection('agent_profiles').create<import('@/types/defesa-civil').AgentProfile>(data)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').AgentProfile>) {
+    return pb
+      .collection('agent_profiles')
+      .update<import('@/types/defesa-civil').AgentProfile>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('agent_profiles').delete(id)
+  },
+}
+
+// ----------------------------------------------------------------------
+// EPI Items Service (Catálogo e Estoque de EPIs)
+// ----------------------------------------------------------------------
+export const epiItemsService = {
+  async list(filter?: string, sort = 'name') {
+    return pb.collection('epi_items').getFullList<import('@/types/defesa-civil').EpiItem>({
+      filter,
+      sort,
+      requestKey: null,
+    })
+  },
+  async get(id: string) {
+    return pb.collection('epi_items').getOne<import('@/types/defesa-civil').EpiItem>(id, {
+      requestKey: null,
+    })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').EpiItem>) {
+    return pb.collection('epi_items').create<import('@/types/defesa-civil').EpiItem>(data)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').EpiItem>) {
+    return pb.collection('epi_items').update<import('@/types/defesa-civil').EpiItem>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('epi_items').delete(id)
+  },
+}
+
+// ----------------------------------------------------------------------
+// EPI Deliveries Service (Entregas, Histórico de Substituições e Baixas)
+// ----------------------------------------------------------------------
+export const epiDeliveriesService = {
+  async list(filter?: string, sort = '-delivery_date') {
+    return pb.collection('epi_deliveries').getFullList<import('@/types/defesa-civil').EpiDelivery>({
+      filter,
+      sort,
+      expand: 'agent,item,delivered_by',
+      requestKey: null,
+    })
+  },
+  async listForAgent(agentId: string) {
+    return pb.collection('epi_deliveries').getFullList<import('@/types/defesa-civil').EpiDelivery>({
+      filter: `agent = "${agentId}"`,
+      sort: '-delivery_date',
+      expand: 'agent,item,delivered_by',
+      requestKey: null,
+    })
+  },
+  async get(id: string) {
+    return pb.collection('epi_deliveries').getOne<import('@/types/defesa-civil').EpiDelivery>(id, {
+      expand: 'agent,item,delivered_by',
+      requestKey: null,
+    })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').EpiDelivery>) {
+    return pb.collection('epi_deliveries').create<import('@/types/defesa-civil').EpiDelivery>(data)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').EpiDelivery>) {
+    return pb
+      .collection('epi_deliveries')
+      .update<import('@/types/defesa-civil').EpiDelivery>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('epi_deliveries').delete(id)
+  },
+}
