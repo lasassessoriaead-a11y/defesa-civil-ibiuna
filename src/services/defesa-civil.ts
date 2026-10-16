@@ -589,3 +589,249 @@ export const appSettingsService = {
     })
   },
 }
+
+// ----------------------------------------------------------------------
+// Risk Sectors Service (Setores de Risco — cadastro técnico municipal)
+// ----------------------------------------------------------------------
+export const riskSectorsService = {
+  async list(filter?: string, sort = 'code', limit = 500) {
+    return pb.collection('risk_sectors').getFullList<import('@/types/defesa-civil').RiskSector>({
+      filter,
+      sort,
+      batch: limit,
+      requestKey: null,
+    })
+  },
+  async get(id: string) {
+    return pb.collection('risk_sectors').getOne<import('@/types/defesa-civil').RiskSector>(id, {
+      requestKey: null,
+    })
+  },
+  async findByCode(code: string) {
+    try {
+      const records = await pb
+        .collection('risk_sectors')
+        .getList<import('@/types/defesa-civil').RiskSector>(1, 1, {
+          filter: `code = "${code}"`,
+          requestKey: null,
+        })
+      return records.items[0] || null
+    } catch {
+      return null
+    }
+  },
+  async create(data: Partial<import('@/types/defesa-civil').RiskSector>) {
+    return pb.collection('risk_sectors').create<import('@/types/defesa-civil').RiskSector>(data)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').RiskSector>) {
+    return pb.collection('risk_sectors').update<import('@/types/defesa-civil').RiskSector>(id, data)
+  },
+  async upsertByCode(
+    data: Partial<import('@/types/defesa-civil').RiskSector> & {
+      code: string
+      municipality: string
+    },
+  ) {
+    const existing = await this.findByCode(data.code)
+    if (existing) {
+      return pb
+        .collection('risk_sectors')
+        .update<import('@/types/defesa-civil').RiskSector>(existing.id, data)
+    }
+    return pb.collection('risk_sectors').create<import('@/types/defesa-civil').RiskSector>(data)
+  },
+  async delete(id: string) {
+    return pb.collection('risk_sectors').delete(id)
+  },
+}
+
+// ----------------------------------------------------------------------
+// Danger Stretches Service (Trechos de Perigo)
+// ----------------------------------------------------------------------
+export const dangerStretchesService = {
+  async list(filter?: string, sort = 'code', limit = 500) {
+    return pb
+      .collection('danger_stretches')
+      .getFullList<import('@/types/defesa-civil').DangerStretch>({
+        filter,
+        sort,
+        batch: limit,
+        requestKey: null,
+      })
+  },
+  async get(id: string) {
+    return pb
+      .collection('danger_stretches')
+      .getOne<import('@/types/defesa-civil').DangerStretch>(id, {
+        requestKey: null,
+      })
+  },
+  async findByCode(code: string) {
+    try {
+      const records = await pb
+        .collection('danger_stretches')
+        .getList<import('@/types/defesa-civil').DangerStretch>(1, 1, {
+          filter: `code = "${code}"`,
+          requestKey: null,
+        })
+      return records.items[0] || null
+    } catch {
+      return null
+    }
+  },
+  async create(data: Partial<import('@/types/defesa-civil').DangerStretch>) {
+    return pb
+      .collection('danger_stretches')
+      .create<import('@/types/defesa-civil').DangerStretch>(data)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').DangerStretch>) {
+    return pb
+      .collection('danger_stretches')
+      .update<import('@/types/defesa-civil').DangerStretch>(id, data)
+  },
+  async upsertByCode(
+    data: Partial<import('@/types/defesa-civil').DangerStretch> & {
+      code: string
+      municipality: string
+    },
+  ) {
+    const existing = await this.findByCode(data.code)
+    if (existing) {
+      return pb
+        .collection('danger_stretches')
+        .update<import('@/types/defesa-civil').DangerStretch>(existing.id, data)
+    }
+    return pb
+      .collection('danger_stretches')
+      .create<import('@/types/defesa-civil').DangerStretch>(data)
+  },
+  async delete(id: string) {
+    return pb.collection('danger_stretches').delete(id)
+  },
+}
+
+// ----------------------------------------------------------------------
+// Strategic Infrastructures Service (Pontes, Aduelas e Drenagem)
+// ----------------------------------------------------------------------
+export const strategicInfrastructuresService = {
+  async list(filter?: string, sort = 'original_code', limit = 500) {
+    return pb
+      .collection('strategic_infrastructures')
+      .getFullList<import('@/types/defesa-civil').StrategicInfrastructure>({
+        filter,
+        sort,
+        batch: limit,
+        expand: 'verified_by',
+        requestKey: null,
+      })
+  },
+  async get(id: string) {
+    return pb
+      .collection('strategic_infrastructures')
+      .getOne<import('@/types/defesa-civil').StrategicInfrastructure>(id, {
+        expand: 'verified_by',
+        requestKey: null,
+      })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').StrategicInfrastructure>) {
+    return pb
+      .collection('strategic_infrastructures')
+      .create<import('@/types/defesa-civil').StrategicInfrastructure>(data)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').StrategicInfrastructure>) {
+    return pb
+      .collection('strategic_infrastructures')
+      .update<import('@/types/defesa-civil').StrategicInfrastructure>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('strategic_infrastructures').delete(id)
+  },
+  async findByCode(code: string) {
+    try {
+      const records = await pb
+        .collection('strategic_infrastructures')
+        .getList<import('@/types/defesa-civil').StrategicInfrastructure>(1, 1, {
+          filter: `original_code = "${code}"`,
+          requestKey: null,
+        })
+      return records.items[0] || null
+    } catch {
+      return null
+    }
+  },
+}
+
+// ----------------------------------------------------------------------
+// Bridge Inspections Service (Inspeções Técnicas)
+// ----------------------------------------------------------------------
+export const bridgeInspectionsService = {
+  async listForInfrastructure(infraId: string) {
+    return pb
+      .collection('bridge_inspections')
+      .getFullList<import('@/types/defesa-civil').BridgeInspection>({
+        filter: `infrastructure = "${infraId}"`,
+        sort: '-inspection_date',
+        expand: 'inspector',
+        requestKey: null,
+      })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').BridgeInspection>) {
+    return pb
+      .collection('bridge_inspections')
+      .create<import('@/types/defesa-civil').BridgeInspection>(data)
+  },
+}
+
+// ----------------------------------------------------------------------
+// External Demands Service (Demandas para outras Secretarias)
+// ----------------------------------------------------------------------
+export const externalDemandsService = {
+  async list(filter?: string, sort = '-created') {
+    return pb
+      .collection('external_demands')
+      .getFullList<import('@/types/defesa-civil').ExternalDemand>({
+        filter,
+        sort,
+        expand: 'related_occurrence,related_infrastructure,created_by',
+        requestKey: null,
+      })
+  },
+  async get(id: string) {
+    return pb
+      .collection('external_demands')
+      .getOne<import('@/types/defesa-civil').ExternalDemand>(id, {
+        expand: 'related_occurrence,related_infrastructure,created_by',
+        requestKey: null,
+      })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').ExternalDemand>) {
+    return pb
+      .collection('external_demands')
+      .create<import('@/types/defesa-civil').ExternalDemand>(data)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').ExternalDemand>) {
+    return pb
+      .collection('external_demands')
+      .update<import('@/types/defesa-civil').ExternalDemand>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('external_demands').delete(id)
+  },
+}
+
+// ----------------------------------------------------------------------
+// Geo Imports Batch Service (Auditoria e Lotes)
+// ----------------------------------------------------------------------
+export const geoImportsService = {
+  async list(filter?: string, sort = '-created') {
+    return pb.collection('geo_imports').getFullList<import('@/types/defesa-civil').GeoImportBatch>({
+      filter,
+      sort,
+      expand: 'imported_by',
+      requestKey: null,
+    })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').GeoImportBatch>) {
+    return pb.collection('geo_imports').create<import('@/types/defesa-civil').GeoImportBatch>(data)
+  },
+}

@@ -149,6 +149,10 @@ export interface Occurrence extends RecordModel {
   client_uuid?: string
   prov_code?: string
   sync_status?: 'synced' | 'pending'
+  // Suporte de apoio geográfico (vínculos da Etapa Mapeamentos & Inteligência Territorial)
+  risk_sector?: string
+  danger_stretch?: string
+  strategic_infrastructure?: string
   expand?: {
     reported_by?: {
       id: string
@@ -157,6 +161,208 @@ export interface Occurrence extends RecordModel {
     }
     requester?: Requester
     municipality?: Municipality
+    risk_sector?: RiskSector
+    danger_stretch?: DangerStretch
+    strategic_infrastructure?: StrategicInfrastructure
+  }
+}
+
+// ---------------------------------------------
+// Tipos de Setores de Risco & Trechos de Perigo
+// ---------------------------------------------
+export type RiskGradeLevel = 'R1' | 'R2' | 'R3' | 'R4' | 'indefinido'
+export type ValidationStatus = 'aprovado' | 'pendente_conferencia' | 'rejeitado' | 'incompleto'
+export type GeometryStatus = 'ausente' | 'pendente' | 'validada' | 'invalida'
+
+export interface RiskSector extends RecordModel {
+  municipality: string
+  code: string // IBI-01/A03/S11/ESC/R3
+  sector_number?: string // Setor 11
+  zone?: string
+  area_number?: string
+  area_name?: string
+  plate_number?: string // PRANCHA 053
+  location?: string
+  process_type?: string
+  danger_grade?: string
+  vulnerability_grade?: string
+  risk_grade?: string
+  risk_level?: RiskGradeLevel
+  affected_buildings?: number
+  affected_dwellings?: number
+  affected_residents?: number
+  affected_roads_length?: number
+  disaster_history?: string
+  regional_risk_info?: string
+  expected_processes?: string
+  description?: string
+  recommendations?: string
+  validation_status: ValidationStatus
+  geometry_status: GeometryStatus
+  geometry_geojson?: string // Polygon / MultiPolygon em WGS84
+  import_source?: string
+  import_batch_id?: string
+  raw_attributes?: Record<string, any>
+  notes?: string
+}
+
+export interface DangerStretch extends RecordModel {
+  municipality: string
+  code: string
+  stretch_number?: string
+  zone?: string
+  area_number?: string
+  area_name?: string
+  location?: string
+  process_type?: string
+  danger_grade?: string
+  vulnerability_grade?: string
+  risk_grade?: string
+  risk_level?: RiskGradeLevel
+  affected_roads_length?: number
+  affected_dwellings?: number
+  affected_residents?: number
+  disaster_history?: string
+  description?: string
+  recommendations?: string
+  validation_status: ValidationStatus
+  geometry_status: GeometryStatus
+  geometry_geojson?: string // LineString / MultiLineString em WGS84
+  import_source?: string
+  import_batch_id?: string
+  raw_attributes?: Record<string, any>
+  notes?: string
+}
+
+// ---------------------------------------------
+// Infraestruturas Estratégicas (Pontes, Aduelas, etc.)
+// ---------------------------------------------
+export type InfrastructureType =
+  | 'ponte'
+  | 'aduela'
+  | 'bueiro'
+  | 'passarela'
+  | 'outro'
+  | 'pendente_classificacao'
+
+export type CoordinateStatus = 'valida' | 'duvidosa' | 'ilegivel' | 'ausente'
+export type StructuralCondition = 'bom' | 'regular' | 'ruim' | 'critico' | 'nao_avaliado'
+export type AdministrativePriority = 'baixa' | 'media' | 'alta' | 'urgente'
+export type InspectionStatus = 'em_dia' | 'necessita_vistoria' | 'em_reforma' | 'interditada'
+
+export interface StrategicInfrastructure extends RecordModel {
+  municipality: string
+  original_code: string // P1, P2 ... P224, P Gabri
+  type: InfrastructureType
+  name?: string
+  neighborhood?: string
+  reference_point?: string
+  channel_width?: string
+  dimensions?: string
+  observed_problems?: string
+  notes?: string
+  lat_dms?: string
+  lon_dms?: string
+  latitude?: number
+  longitude?: number
+  coordinate_status: CoordinateStatus
+  validation_status: 'pendente_conferencia' | 'conferido' | 'divergente' | 'rejeitado'
+  source_document?: string
+  source_page?: number
+  is_handwritten_transcription?: boolean
+  structural_condition?: StructuralCondition
+  administrative_priority?: AdministrativePriority
+  inspection_status?: InspectionStatus
+  last_inspection_date?: string
+  verified_by?: string
+  verified_at?: string
+  verification_notes?: string
+  expand?: {
+    verified_by?: User
+    municipality?: Municipality
+  }
+}
+
+export interface BridgeInspection extends RecordModel {
+  municipality: string
+  infrastructure: string
+  inspector?: string
+  inspection_date: string
+  structural_condition: 'bom' | 'regular' | 'ruim' | 'critico'
+  problems_found?: string
+  technical_recommendations?: string
+  traffic_condition?: 'livre' | 'restricao_peso' | 'meia_pista' | 'interditada'
+  photo?: string[]
+  expand?: {
+    inspector?: User
+    infrastructure?: StrategicInfrastructure
+  }
+}
+
+// ---------------------------------------------
+// Demandas para Outras Secretarias
+// ---------------------------------------------
+export type TargetDepartment =
+  | 'obras'
+  | 'servicos_municipais'
+  | 'meio_ambiente'
+  | 'assistencia_social'
+  | 'saude'
+  | 'planejamento'
+  | 'transito'
+  | 'outra'
+
+export type DemandStatus =
+  | 'identificada'
+  | 'encaminhada'
+  | 'em_analise'
+  | 'em_atendimento'
+  | 'concluida'
+  | 'arquivada'
+
+export interface ExternalDemand extends RecordModel {
+  municipality: string
+  title: string
+  problem_description: string
+  location: string
+  latitude?: number
+  longitude?: number
+  target_department: TargetDepartment
+  priority: 'baixa' | 'media' | 'alta' | 'urgente'
+  status: DemandStatus
+  forwarded_at?: string
+  forwarded_protocol?: string
+  department_response?: string
+  response_date?: string
+  action_history?: string
+  related_occurrence?: string
+  related_infrastructure?: string
+  created_by?: string
+  photos?: string[]
+  expand?: {
+    related_occurrence?: Occurrence
+    related_infrastructure?: StrategicInfrastructure
+    created_by?: User
+  }
+}
+
+// ---------------------------------------------
+// Lotes de Importação & Auditoria de Qualidade
+// ---------------------------------------------
+export interface GeoImportBatch extends RecordModel {
+  municipality: string
+  filename: string
+  file_type: string
+  imported_by?: string
+  total_records: number
+  valid_records: number
+  duplicate_records: number
+  incomplete_records: number
+  rejected_records: number
+  summary?: string
+  rejection_reasons?: { line: number; code?: string; reason: string }[]
+  expand?: {
+    imported_by?: User
   }
 }
 

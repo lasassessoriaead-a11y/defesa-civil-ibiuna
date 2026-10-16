@@ -18,6 +18,11 @@ import { UsersManagementPage } from '@/pages/UsersManagementPage'
 import { OfficialDocumentsPage } from '@/pages/OfficialDocumentsPage'
 import { TreeAuthorizationsPage } from '@/pages/TreeAuthorizationsPage'
 import { ReportsPage } from '@/pages/ReportsPage'
+import { RiskImportPage } from '@/pages/RiskImportPage'
+import { StrategicInfrastructuresPage } from '@/pages/StrategicInfrastructuresPage'
+import { BridgeConferencePage } from '@/pages/BridgeConferencePage'
+import { RiskSectorsPage } from '@/pages/RiskSectorsPage'
+import { InteragencyDemandsPage } from '@/pages/InteragencyDemandsPage'
 import NotFound from '@/pages/NotFound'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -95,6 +100,12 @@ export const App: React.FC = () => {
           >
             <Route path="/painel" element={<Dashboard />} />
             <Route path="/ocorrencias" element={<OccurrencesPage />} />
+            <Route path="/setores-risco" element={<RiskSectorsPage />} />
+            <Route path="/infraestruturas" element={<StrategicInfrastructuresPage />} />
+            <Route path="/pontes-conferencia" element={<BridgeConferencePage />} />
+            <Route path="/demandas-secretarias" element={<InteragencyDemandsPage />} />
+            <Route path="/importacao-dados" element={<RiskImportPage />} />
+            <Route path="/importacao-risco" element={<RiskImportPage />} />
             <Route path="/abrigos" element={<SheltersPage />} />
             <Route path="/equipes" element={<TeamsPage />} />
             <Route path="/suprimentos" element={<SuppliesPage />} />

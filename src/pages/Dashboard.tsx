@@ -16,6 +16,8 @@ import {
   Clock,
   MapPin,
   Flame,
+  FileSpreadsheet,
+  ShieldAlert,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,8 +32,23 @@ import {
   suppliesService,
   alertsService,
   affectedAreasService,
+  riskSectorsService,
+  dangerStretchesService,
+  strategicInfrastructuresService,
+  externalDemandsService,
 } from '@/services/defesa-civil'
-import type { Occurrence, Shelter, Team, Supply, Alert, AffectedArea } from '@/types/defesa-civil'
+import type {
+  Occurrence,
+  Shelter,
+  Team,
+  Supply,
+  Alert,
+  AffectedArea,
+  RiskSector,
+  DangerStretch,
+  StrategicInfrastructure,
+  ExternalDemand,
+} from '@/types/defesa-civil'
 import { useRealtime } from '@/hooks/use-realtime'
 
 // Count-up animated number component
@@ -91,6 +108,10 @@ export const Dashboard: React.FC = () => {
   const [supplies, setSupplies] = useState<Supply[]>([])
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [areas, setAreas] = useState<AffectedArea[]>([])
+  const [riskSectors, setRiskSectors] = useState<RiskSector[]>([])
+  const [dangerStretches, setDangerStretches] = useState<DangerStretch[]>([])
+  const [infrastructures, setInfrastructures] = useState<StrategicInfrastructure[]>([])
+  const [demands, setDemands] = useState<ExternalDemand[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   // Realtime pulses
@@ -99,13 +120,28 @@ export const Dashboard: React.FC = () => {
 
   const loadAllData = async () => {
     try {
-      const [occData, shelterData, teamData, supplyData, alertData, areaData] = await Promise.all([
+      const [
+        occData,
+        shelterData,
+        teamData,
+        supplyData,
+        alertData,
+        areaData,
+        riskSecData,
+        dangerStrData,
+        infraData,
+        demandData,
+      ] = await Promise.all([
         occurrencesService.list(),
         sheltersService.list(),
         teamsService.list(),
         suppliesService.list(),
         alertsService.list(),
         affectedAreasService.list(),
+        riskSectorsService.list(undefined, 'code'),
+        dangerStretchesService.list(undefined, 'code'),
+        strategicInfrastructuresService.list(undefined, 'original_code'),
+        externalDemandsService.list(undefined, '-created'),
       ])
       setOccurrences(occData)
       setShelters(shelterData)
@@ -113,6 +149,10 @@ export const Dashboard: React.FC = () => {
       setSupplies(supplyData)
       setAlerts(alertData)
       setAreas(areaData)
+      setRiskSectors(riskSecData)
+      setDangerStretches(dangerStrData)
+      setInfrastructures(infraData)
+      setDemands(demandData)
     } catch (err) {
       console.error('Falha ao carregar dashboard:', err)
     } finally {
@@ -351,11 +391,15 @@ export const Dashboard: React.FC = () => {
             shelters={shelters}
             teams={teams}
             areas={areas}
+            strategicInfrastructures={infrastructures}
+            riskSectorsCount={riskSectors.length}
+            dangerStretchesCount={dangerStretches.length}
             onSelectItem={(type, item) => {
               if (type === 'occurrence') navigate(`/ocorrencias?id=${item.id}`)
               if (type === 'shelter') navigate('/abrigos')
               if (type === 'team') navigate('/equipes')
               if (type === 'area') navigate('/areas-afetadas')
+              if (type === 'infrastructure') navigate('/infraestruturas')
             }}
           />
         </CardContent>
@@ -466,7 +510,7 @@ export const Dashboard: React.FC = () => {
 
           {/* Ações Rápidas Card */}
           <Card className="border-blue-200 bg-gradient-to-br from-blue-50/50 to-indigo-50/50 shadow-sm">
-            <CardHeader className="py-3 px-5 border-b border-blue-100">
+            <CardHeader className="py-3 px-5 border-blue-100">
               <CardTitle className="text-xs font-bold text-blue-900 uppercase tracking-wider">
                 Ações Operacionais Rápidas
               </CardTitle>
@@ -495,15 +539,226 @@ export const Dashboard: React.FC = () => {
               </Button>
 
               <Button
-                onClick={() => navigate('/assistente')}
+                onClick={() => navigate('/importacao-dados')}
                 variant="outline"
-                className="bg-white hover:bg-blue-50 hover:text-blue-700 hover:border-blue-300 border-slate-200 text-xs font-semibold h-11 justify-start gap-2 shadow-xs transition-all"
+                className="bg-white hover:bg-emerald-50 hover:text-emerald-700 hover:border-emerald-300 border-slate-200 text-xs font-semibold h-11 justify-start gap-2 shadow-xs transition-all"
               >
-                <div className="w-6 h-6 rounded bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                  <Bot className="w-3.5 h-3.5" />
+                <div className="w-6 h-6 rounded bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+                  <FileSpreadsheet className="w-3.5 h-3.5" />
                 </div>
-                Consultar Assistente
+                Importar Dados Técnicos
               </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* SEÇÃO INTELIGÊNCIA TERRITORIAL E PREVENÇÃO */}
+      <div className="space-y-4 pt-4 border-t border-slate-200">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
+              <ShieldAlert className="w-5 h-5 text-blue-600" />
+              Inteligência Territorial & Prevenção
+            </h3>
+            <p className="text-xs text-slate-500">
+              Levantamento técnico municipal de Ibiúna/SP (Setores de risco, trechos de via, pontes
+              e demandas)
+            </p>
+          </div>
+
+          <div className="flex gap-2">
+            <Link to="/setores-risco">
+              <Button size="sm" variant="outline" className="text-xs h-8">
+                Ver Setores ({riskSectors.length})
+              </Button>
+            </Link>
+            <Link to="/infraestruturas">
+              <Button size="sm" variant="outline" className="text-xs h-8">
+                Ver Infraestruturas ({infrastructures.length})
+              </Button>
+            </Link>
+            <Link to="/demandas-secretarias">
+              <Button size="sm" variant="outline" className="text-xs h-8">
+                Demandas ({demands.length})
+              </Button>
+            </Link>
+          </div>
+        </div>
+
+        {/* Grid de Métricas de Inteligência Territorial */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+          <Card className="border-slate-200 bg-white">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-slate-500">Setores de Risco</p>
+              <p className="text-2xl font-bold text-blue-900 mt-1">
+                <AnimatedCount value={riskSectors.length} />
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">Polígonos cadastrados</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 bg-white">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-slate-500">Trechos de Perigo</p>
+              <p className="text-2xl font-bold text-amber-900 mt-1">
+                <AnimatedCount value={dangerStretches.length} />
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">Vias monitoradas</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 bg-white">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-slate-500">Pontes & Aduelas</p>
+              <p className="text-2xl font-bold text-emerald-900 mt-1">
+                <AnimatedCount value={infrastructures.length} />
+              </p>
+              <p className="text-[10px] text-slate-400 mt-0.5">Cadastros de campo</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-amber-200 bg-amber-50/30">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-amber-700">Pendentes Conferência</p>
+              <p className="text-2xl font-bold text-amber-900 mt-1">
+                <AnimatedCount
+                  value={
+                    infrastructures.filter((i) => i.validation_status === 'pendente_conferencia')
+                      .length
+                  }
+                />
+              </p>
+              <p className="text-[10px] text-amber-600 mt-0.5">Aguardando validação</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-orange-200 bg-orange-50/30">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-orange-700">Necessitam Vistoria</p>
+              <p className="text-2xl font-bold text-orange-900 mt-1">
+                <AnimatedCount value={infrastructures.filter((i) => i.needs_inspection).length} />
+              </p>
+              <p className="text-[10px] text-orange-600 mt-0.5">Alerta estrutural</p>
+            </CardContent>
+          </Card>
+
+          <Card className="border-purple-200 bg-purple-50/30">
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-purple-700">Demandas Abertas</p>
+              <p className="text-2xl font-bold text-purple-900 mt-1">
+                <AnimatedCount
+                  value={
+                    demands.filter(
+                      (d) =>
+                        d.forwarding_status === 'identificada' ||
+                        d.forwarding_status === 'encaminhada',
+                    ).length
+                  }
+                />
+              </p>
+              <p className="text-[10px] text-purple-600 mt-0.5">Intersetoriais ativas</p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Distribuição R1-R4 e Bairros Críticos */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader className="py-3 px-4 border-b">
+              <CardTitle className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                Distribuição por Grau de Risco (R1 - R4)
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-3">
+              {[
+                {
+                  label: 'R4 - Muito Alto',
+                  count: [...riskSectors, ...dangerStretches].filter((x) => x.risk_level === 'R4')
+                    .length,
+                  color: 'bg-red-600',
+                  text: 'text-red-700',
+                },
+                {
+                  label: 'R3 - Alto',
+                  count: [...riskSectors, ...dangerStretches].filter((x) => x.risk_level === 'R3')
+                    .length,
+                  color: 'bg-orange-500',
+                  text: 'text-orange-700',
+                },
+                {
+                  label: 'R2 - Médio',
+                  count: [...riskSectors, ...dangerStretches].filter((x) => x.risk_level === 'R2')
+                    .length,
+                  color: 'bg-amber-400',
+                  text: 'text-amber-800',
+                },
+                {
+                  label: 'R1 - Baixo',
+                  count: [...riskSectors, ...dangerStretches].filter((x) => x.risk_level === 'R1')
+                    .length,
+                  color: 'bg-emerald-500',
+                  text: 'text-emerald-700',
+                },
+              ].map((item, idx) => {
+                const total = riskSectors.length + dangerStretches.length
+                const pct = total > 0 ? Math.round((item.count / total) * 100) : 0
+                return (
+                  <div key={idx} className="space-y-1">
+                    <div className="flex justify-between text-xs font-semibold">
+                      <span className={item.text}>{item.label}</span>
+                      <span className="text-slate-600">
+                        {item.count} ({pct}%)
+                      </span>
+                    </div>
+                    <Progress value={pct} className={`h-2 [&>div]:${item.color}`} />
+                  </div>
+                )
+              })}
+              {riskSectors.length + dangerStretches.length === 0 && (
+                <p className="text-xs text-slate-500 text-center py-4">
+                  Nenhum setor ou trecho importado ainda. Suba a planilha técnica 2024.
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader className="py-3 px-4 border-b">
+              <CardTitle className="text-xs font-bold text-slate-800 uppercase tracking-wider">
+                Infraestruturas com Maior Demanda de Inspeção
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 space-y-2 text-xs">
+              {infrastructures.filter((i) => i.needs_inspection).slice(0, 4).length > 0 ? (
+                infrastructures
+                  .filter((i) => i.needs_inspection)
+                  .slice(0, 4)
+                  .map((infra) => (
+                    <div
+                      key={infra.id}
+                      onClick={() => navigate('/infraestruturas')}
+                      className="p-2.5 bg-orange-50/50 rounded border border-orange-200 hover:bg-orange-100/50 cursor-pointer flex items-center justify-between"
+                    >
+                      <div>
+                        <span className="font-bold text-slate-900 mr-2">{infra.original_code}</span>
+                        <span className="text-slate-600">
+                          {infra.neighborhood || 'Localidade não informada'}
+                        </span>
+                        {infra.problems_reported && (
+                          <p className="text-[11px] text-amber-800 line-clamp-1 mt-0.5">
+                            {infra.problems_reported}
+                          </p>
+                        )}
+                      </div>
+                      <Badge className="bg-orange-600 text-white text-[10px]">Vistoria</Badge>
+                    </div>
+                  ))
+              ) : (
+                <p className="text-xs text-slate-500 text-center py-6">
+                  Nenhuma infraestrutura sinalizada para vistoria urgente no momento.
+                </p>
+              )}
             </CardContent>
           </Card>
         </div>

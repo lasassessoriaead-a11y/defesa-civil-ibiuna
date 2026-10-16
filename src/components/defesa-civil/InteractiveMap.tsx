@@ -28,7 +28,13 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import type { Occurrence, Shelter, Team, AffectedArea } from '@/types/defesa-civil'
+import type {
+  Occurrence,
+  Shelter,
+  Team,
+  AffectedArea,
+  StrategicInfrastructure,
+} from '@/types/defesa-civil'
 import { SeverityBadge, getHazardIcon } from './StatusBadges'
 
 // Helper to construct modern custom HTML markers with DivIcon
@@ -258,6 +264,9 @@ export interface InteractiveMapProps {
   shelters?: Shelter[]
   teams?: Team[]
   areas?: AffectedArea[]
+  strategicInfrastructures?: StrategicInfrastructure[]
+  riskSectorsCount?: number
+  dangerStretchesCount?: number
   selectedItem?: { type: string; id: string } | null
   onSelectItem?: (type: string, item: any) => void
   interactivePick?: boolean
@@ -277,12 +286,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   shelters = [],
   teams = [],
   areas = [],
+  strategicInfrastructures = [],
+  riskSectorsCount = 0,
+  dangerStretchesCount = 0,
   selectedItem,
   onSelectItem,
   interactivePick = false,
   onPickCoordinate,
   pickedCoordinate,
-  center = [-23.5505, -46.6333],
+  center = [-23.655, -47.22],
   zoom = 13,
   allowDrawingPolygon = false,
   polygonPoints = [],
@@ -291,6 +303,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 }) => {
   // Layer toggles
   const [showOccurrences, setShowOccurrences] = useState(true)
+  const [showInfrastructures, setShowInfrastructures] = useState(true)
   const [showAreas, setShowAreas] = useState(true)
   const [showShelters, setShowShelters] = useState(true)
   const [showTeams, setShowTeams] = useState(true)
@@ -551,6 +564,93 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             )
           })}
 
+        {/* Render Strategic Infrastructures (Pontes e Aduelas com coordenadas válidas) */}
+        {showInfrastructures &&
+          strategicInfrastructures.map((infra) => {
+            if (
+              infra.latitude === undefined ||
+              infra.longitude === undefined ||
+              infra.latitude === null ||
+              infra.longitude === null ||
+              isNaN(infra.latitude) ||
+              isNaN(infra.longitude)
+            ) {
+              return null
+            }
+
+            const isValidated = infra.validation_status === 'conferido'
+            const isNeedInspection = infra.needs_inspection
+            const bgColor = isNeedInspection ? '#ea580c' : isValidated ? '#059669' : '#ca8a04'
+
+            const customIcon = createDivIcon(
+              `<div style="
+                background-color: ${bgColor};
+                width: 26px;
+                height: 26px;
+                border-radius: 6px;
+                border: 2px solid white;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-weight: bold;
+                font-size: 10px;
+              ">${infra.structure_type === 'aduela' ? 'AD' : 'PT'}</div>`,
+              'infra-marker',
+              [26, 26],
+              [13, 13],
+            )
+
+            return (
+              <Marker
+                key={infra.id}
+                position={[infra.latitude, infra.longitude]}
+                icon={customIcon}
+                eventHandlers={{
+                  click: () => onSelectItem?.('infrastructure', infra),
+                }}
+              >
+                <Popup>
+                  <div className="p-1 min-w-[200px] text-xs space-y-1">
+                    <div className="flex items-center justify-between border-b pb-1 font-bold">
+                      <span className="text-slate-900">
+                        {infra.original_code} ({infra.structure_type?.toUpperCase() || 'ESTRUTURA'})
+                      </span>
+                      <span
+                        className={`px-1.5 py-0.5 rounded text-[10px] ${
+                          isValidated
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-amber-100 text-amber-800'
+                        }`}
+                      >
+                        {infra.validation_status}
+                      </span>
+                    </div>
+                    <p className="text-slate-600">
+                      <strong>Bairro:</strong> {infra.neighborhood || 'Não informado'}
+                    </p>
+                    {infra.reference_point && (
+                      <p className="text-slate-600">
+                        <strong>Ref:</strong> {infra.reference_point}
+                      </p>
+                    )}
+                    {infra.structural_condition && (
+                      <p className="text-slate-600">
+                        <strong>Condição:</strong> {infra.structural_condition}
+                      </p>
+                    )}
+                    {infra.problems_reported && (
+                      <p className="text-amber-800 bg-amber-50 p-1 rounded border border-amber-200">
+                        <strong>Problema:</strong> {infra.problems_reported}
+                      </p>
+                    )}
+                  </div>
+                </Popup>
+              </Marker>
+            )
+          })}
+
         {/* Render Interactively Picked Pin Marker */}
         {pickedCoordinate &&
           pickedCoordinate.lat !== undefined &&
@@ -578,6 +678,21 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             >
               <AlertOctagon className="w-3.5 h-3.5 mr-1 text-red-600" />
               Ocorrências ({occurrences.length})
+            </Button>
+
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowInfrastructures(!showInfrastructures)}
+              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                showInfrastructures
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+            >
+              <Building2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
+              Pontes & Aduelas (
+              {strategicInfrastructures.filter((i) => i.latitude && i.longitude).length})
             </Button>
 
             <Button
@@ -634,11 +749,14 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           <span className="w-2 h-2 rounded-full bg-orange-500" /> Alto
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-amber-500" /> Médio
+          <span className="w-2 h-2 rounded-full bg-emerald-600" /> Ponte/Aduela
         </span>
-        <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-emerald-500" /> Baixo
-        </span>
+        {(riskSectorsCount > 0 || dangerStretchesCount > 0) && (
+          <span className="flex items-center gap-1 text-slate-500">
+            <span className="w-2 h-2 rounded-full border border-dashed border-slate-400" />
+            {riskSectorsCount + dangerStretchesCount} setores/trechos (sem geom.)
+          </span>
+        )}
       </div>
 
       {/* Helper hint for interactive pick or drawing */}
