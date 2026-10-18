@@ -2348,12 +2348,20 @@ migrate(
 
     for (let i = 0; i < rawData.length; i++) {
       const row = rawData[i]
-      // Idempotência: verificar existência
+      // Idempotência estrita: chave composta (municipality + source_document + source_page + original_code)
+      // Usando query parametrizada segura contra apóstrofos em row.code (ex: P145', P158', P191')
       let existing = null
       try {
+        const safeCode = (row.code || '').replace(/'/g, "''")
         existing = app.findFirstRecordByFilter(
           'strategic_infrastructures',
-          "municipality = '" + munId + "' && original_code = '" + row.code + "'",
+          "municipality = '" +
+            munId +
+            "' && source_document = 'Pontes e aduelas-21295.pdf' && source_page = " +
+            row.page +
+            " && original_code = '" +
+            safeCode +
+            "'",
         )
       } catch (_) {}
 

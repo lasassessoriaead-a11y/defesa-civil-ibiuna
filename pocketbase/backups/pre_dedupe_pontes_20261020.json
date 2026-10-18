@@ -1,0 +1,119 @@
+{
+  "backupTimestamp": "2026-10-20T18:00:00.000Z",
+  "reason": "Backup pré-deduplicação pontes e aduelas de Ibiúna (removendo 3 duplicatas criadas por reexecução)",
+  "municipalityId": "cw9b6e2pqv89i3p",
+  "collections": {
+    "strategic_infrastructures_duplicates_identified": [
+      {
+        "id": "139l315lnkmfnky",
+        "created": "2026-10-18 23:10:10.780Z",
+        "updated": "2026-10-18 23:10:10.780Z",
+        "original_code": "P145'",
+        "municipality": "cw9b6e2pqv89i3p",
+        "source_document": "Pontes e aduelas-21295.pdf",
+        "source_page": 4,
+        "lat_dms": "23°37'6.15\"S",
+        "lon_dms": "47°13'6.95\"O",
+        "latitude": -23.618375,
+        "longitude": -47.218597,
+        "coordinate_status": "valida",
+        "validation_status": "pendente_conferencia",
+        "type": "pendente_classificacao",
+        "neighborhood": "Il Córregos",
+        "notes": "Notação P145' com apóstrofo no original",
+        "is_handwritten_transcription": true,
+        "structural_condition": "nao_avaliado",
+        "administrative_priority": "media",
+        "inspection_status": "necessita_vistoria",
+        "duplicate_of_original_id": "v0t946o7qg7t4nd",
+        "action": "delete"
+      },
+      {
+        "id": "4vepk2hz47c7fnw",
+        "created": "2026-10-18 23:10:10.782Z",
+        "updated": "2026-10-18 23:10:10.782Z",
+        "original_code": "P158'",
+        "municipality": "cw9b6e2pqv89i3p",
+        "source_document": "Pontes e aduelas-21295.pdf",
+        "source_page": 4,
+        "lat_dms": "23°40'50.56\"S",
+        "lon_dms": "47°11'29.51\"O",
+        "latitude": -23.680711,
+        "longitude": -47.191531,
+        "coordinate_status": "valida",
+        "validation_status": "pendente_conferencia",
+        "type": "pendente_classificacao",
+        "neighborhood": "Tavares",
+        "notes": "P158' com apóstrofo",
+        "is_handwritten_transcription": true,
+        "structural_condition": "nao_avaliado",
+        "administrative_priority": "media",
+        "inspection_status": "necessita_vistoria",
+        "duplicate_of_original_id": "2ms2vung6mmud28",
+        "action": "delete"
+      },
+      {
+        "id": "s80ehz6cuf1fkn3",
+        "created": "2026-10-18 23:10:10.786Z",
+        "updated": "2026-10-18 23:10:10.786Z",
+        "original_code": "P191'",
+        "municipality": "cw9b6e2pqv89i3p",
+        "source_document": "Pontes e aduelas-21295.pdf",
+        "source_page": 4,
+        "lat_dms": "23°38'33.13\"S",
+        "lon_dms": "47°9'12.99\"O",
+        "latitude": -23.642536,
+        "longitude": -47.153608,
+        "coordinate_status": "valida",
+        "validation_status": "pendente_conferencia",
+        "type": "pendente_classificacao",
+        "neighborhood": "",
+        "dimensions": "L.P. 645 Comp. 1600mg / 2-R. 720g/4P330",
+        "notes": "Anotações manuscritas de vão e ferragem",
+        "is_handwritten_transcription": true,
+        "structural_condition": "nao_avaliado",
+        "administrative_priority": "media",
+        "inspection_status": "necessita_vistoria",
+        "duplicate_of_original_id": "6vakmkw7wbt5rc2",
+        "action": "delete"
+      }
+    ],
+    "preserved_originals": [
+      {
+        "id": "v0t946o7qg7t4nd",
+        "created": "2026-10-18 23:07:20.534Z",
+        "original_code": "P145'",
+        "source_document": "Pontes e aduelas-21295.pdf",
+        "source_page": 4
+      },
+      {
+        "id": "2ms2vung6mmud28",
+        "created": "2026-10-18 23:07:20.538Z",
+        "original_code": "P158'",
+        "source_document": "Pontes e aduelas-21295.pdf",
+        "source_page": 4
+      },
+      {
+        "id": "6vakmkw7wbt5rc2",
+        "created": "2026-10-18 23:07:20.567Z",
+        "original_code": "P191'",
+        "source_document": "Pontes e aduelas-21295.pdf",
+        "source_page": 4
+      }
+    ],
+    "counts_before_cleanup": {
+      "strategic_infrastructures_total": 218,
+      "strategic_infrastructures_pdf_total": 218,
+      "strategic_infrastructures_valida": 212,
+      "strategic_infrastructures_duvidosa": 5,
+      "strategic_infrastructures_ausente": 1,
+      "risk_sectors": 290,
+      "danger_stretches": 203,
+      "occurrences": 3,
+      "counters": {
+        "OC": 3,
+        "AUT": 101
+      }
+    }
+  }
+}

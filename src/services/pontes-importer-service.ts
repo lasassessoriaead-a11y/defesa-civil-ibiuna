@@ -160,17 +160,32 @@ export const pontesImporterService = {
     let imported = 0
     let updated = 0
 
-    // 1. Obter mapa de registros existentes para garantir idempotência
+    // 1. Obter mapa de registros existentes para garantir idempotência estrita
+    // Chave composta: municipality + source_document + source_page + original_code
+    // Preserva apóstrofos e diferencia códigos como P145 vs P145', P117-A vs P117-B, P158 vs P158/2 vs P158'
     const existingRecords = await pb.collection('strategic_infrastructures').getFullList({
       filter: `municipality = "${municipalityId}"`,
       batch: 500,
       requestKey: null,
     })
 
+    const buildDedupKey = (
+      mun: string,
+      doc: string | undefined,
+      page: number | undefined,
+      code: string | undefined,
+    ) => `${mun}::${doc || ''}::${page || ''}::${(code || '').trim()}`
+
     const existingMap = new Map<string, any>()
     for (const rec of existingRecords) {
       if (rec.original_code) {
-        existingMap.set(rec.original_code.trim().toUpperCase(), rec)
+        const key = buildDedupKey(
+          rec.municipality || municipalityId,
+          rec.source_document,
+          rec.source_page,
+          rec.original_code,
+        )
+        existingMap.set(key, rec)
       }
     }
 
@@ -179,7 +194,12 @@ export const pontesImporterService = {
       const item = items[i]
       onProgress?.(i + 1, items.length, item.original_code)
 
-      const key = item.original_code.trim().toUpperCase()
+      const key = buildDedupKey(
+        municipalityId,
+        item.source_document,
+        item.source_page,
+        item.original_code,
+      )
       const existing = existingMap.get(key)
 
       const payload: Record<string, any> = {
