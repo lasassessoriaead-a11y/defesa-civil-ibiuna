@@ -46,6 +46,7 @@ import { useToast } from '@/hooks/use-toast'
 import { strategicInfrastructuresService } from '@/services/defesa-civil'
 import { dmsToDecimal, isWithinIbiunaBounds } from '@/lib/geo-utils'
 import type { StrategicInfrastructure } from '@/types/defesa-civil'
+import { pontesImporterService } from '@/services/pontes-importer-service'
 
 // Páginas fotografadas do levantamento de campo do PDF Pontes e aduelas.pdf
 // Para visualização direta lado a lado na conferência humana
@@ -96,8 +97,38 @@ export const BridgeConferencePage: React.FC = () => {
   const [editPriority, setEditPriority] = useState<string>('media')
   const [editInspectionStatus, setEditInspectionStatus] = useState<string>('em_dia')
   const [isSaving, setIsSaving] = useState(false)
+  const [isImportingBatch, setIsImportingBatch] = useState(false)
+  const [importProgressText, setImportProgressText] = useState('')
 
-  const municipalityId = user?.municipality || ''
+  const municipalityId = user?.municipality || 'cw9b6e2pqv89i3p'
+
+  // Sincronização / Reimportação direta com feedback seguro
+  const handleBatchSync = async () => {
+    setIsImportingBatch(true)
+    setImportProgressText('Iniciando conciliação...')
+    try {
+      const summary = await pontesImporterService.executeImport(
+        municipalityId,
+        (current, total, code) => {
+          setImportProgressText(`Conciliando ${current}/${total} (${code})...`)
+        },
+      )
+      toast({
+        title: 'Sincronização concluída com sucesso',
+        description: `${summary.totalImported} criados, ${summary.totalUpdated} atualizados. ${summary.validCoordinatesCount} com coordenadas válidas.`,
+      })
+      await loadInfrastructures()
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro na sincronização',
+        description: err.message || 'Falha ao processar lote.',
+      })
+    } finally {
+      setIsImportingBatch(false)
+      setImportProgressText('')
+    }
+  }
 
   // Carregar lista de pontes e aduelas cadastradas
   const loadInfrastructures = async () => {
@@ -233,9 +264,26 @@ export const BridgeConferencePage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleBatchSync}
+            disabled={isImportingBatch}
+            className="border-indigo-300 text-indigo-700 hover:bg-indigo-50 text-xs font-semibold"
+          >
+            <RotateCcw className={`w-3.5 h-3.5 mr-1.5 ${isImportingBatch ? 'animate-spin' : ''}`} />
+            {isImportingBatch ? importProgressText : 'Reconciliar Lote do PDF'}
+          </Button>
           <Badge variant="outline" className="bg-blue-50 text-blue-800 border-blue-200 py-1">
-            Total Cadastrado: {infrastructures.length} estruturas
+            Total: {infrastructures.length}
+          </Badge>
+          <Badge
+            variant="outline"
+            className="bg-emerald-50 text-emerald-800 border-emerald-200 py-1"
+          >
+            Válidas no Mapa:{' '}
+            {infrastructures.filter((i) => i.coordinate_status === 'valida').length}
           </Badge>
           <Badge variant="outline" className="bg-amber-50 text-amber-800 border-amber-200 py-1">
             Pendentes:{' '}

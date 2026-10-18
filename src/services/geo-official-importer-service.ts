@@ -12,7 +12,7 @@
  * - Isolamento multi-tenant por município
  * - Registro de auditoria em `geo_imports`
  */
-import { pb } from '@/lib/pocketbase/client'
+import pb from '@/lib/pocketbase/client'
 import {
   inspectGpkg,
   extractFeaturesFromTable,

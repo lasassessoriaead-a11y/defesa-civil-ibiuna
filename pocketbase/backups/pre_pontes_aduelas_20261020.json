@@ -1,0 +1,109 @@
+{
+  "backupTimestamp": "2026-10-20T12:00:00.000Z",
+  "reason": "Backup pré-importação real de pontes e aduelas (PDF Pontes e aduelas-21295.pdf)",
+  "municipalityId": "cw9b6e2pqv89i3p",
+  "collections": {
+    "users": [
+      {
+        "id": "yiph11qipwzepce",
+        "email": "luka2510@hotmail.com",
+        "name": "Defesa Civil Operador",
+        "role": "administrador",
+        "municipality": "cw9b6e2pqv89i3p",
+        "created": "2026-08-19 08:56:04.134Z",
+        "updated": "2026-08-19 08:56:04.134Z",
+        "verified": true
+      },
+      {
+        "id": "rfeff9ia6sm78i0",
+        "email": "luis.gustavo@defesacivil.gov.br",
+        "name": "Luis Gustavo",
+        "role": "administrador",
+        "municipality": "cw9b6e2pqv89i3p",
+        "created": "2026-08-19 20:43:36.396Z",
+        "updated": "2026-08-19 20:43:36.396Z",
+        "verified": true
+      }
+    ],
+    "municipalities": [
+      {
+        "id": "cw9b6e2pqv89i3p",
+        "name": "Município Inicial",
+        "city": "Ibiúna",
+        "state": "SP",
+        "doc_header": "PREFEITURA MUNICIPAL - COORDENADORIA MUNICIPAL DE DEFESA CIVIL",
+        "doc_footer": "Defesa Civil Municipal — Atendimento de Emergência 199",
+        "created": "2026-10-15 16:15:40.753Z",
+        "updated": "2026-10-15 16:15:40.753Z"
+      }
+    ],
+    "occurrences": [
+      {
+        "id": "dvey2j1i4isys6f",
+        "code": "OC-2026-00001",
+        "title": "Alagamento",
+        "type": "enchente",
+        "severity": "media",
+        "status": "reportada",
+        "latitude": -23.54344,
+        "longitude": -46.62126,
+        "address": "Tu",
+        "municipality": "cw9b6e2pqv89i3p",
+        "reported_by": "yiph11qipwzepce",
+        "created": "2026-08-20 13:47:29.837Z",
+        "updated": "2026-10-15 16:15:40.808Z"
+      },
+      {
+        "id": "gfkunku1thbd5ld",
+        "code": "OC-2026-00002",
+        "title": "Aaaa",
+        "description": "Poo",
+        "type": "enchente",
+        "severity": "alta",
+        "status": "reportada",
+        "latitude": -23.6603228,
+        "longitude": -47.2189188,
+        "address": "Rua Otávio Rosa ibiuna",
+        "municipality": "cw9b6e2pqv89i3p",
+        "reported_by": "yiph11qipwzepce",
+        "created": "2026-08-20 13:47:51.664Z",
+        "updated": "2026-10-15 16:15:40.808Z"
+      },
+      {
+        "id": "suxdyfwbd7fa4z8",
+        "code": "OC-2026-00003",
+        "title": "Enxurrada",
+        "type": "seca",
+        "severity": "alta",
+        "status": "reportada",
+        "latitude": 11.5118487,
+        "longitude": 104.9003821,
+        "address": "Rua",
+        "municipality": "cw9b6e2pqv89i3p",
+        "reported_by": "yiph11qipwzepce",
+        "created": "2026-10-15 16:01:22.897Z",
+        "updated": "2026-10-15 16:15:40.808Z"
+      }
+    ],
+    "occurrence_counters": [
+      {
+        "id": "am6kp5f9ynnt8xz",
+        "municipality": "cw9b6e2pqv89i3p",
+        "year": 2026,
+        "last_number": 3
+      }
+    ],
+    "document_counters": [
+      {
+        "id": "4ug0l1opj92i6jm",
+        "municipality": "cw9b6e2pqv89i3p",
+        "type": "autorizacao",
+        "year": 2026,
+        "last_number": 101
+      }
+    ],
+    "strategic_infrastructures_before_count": 0,
+    "danger_stretches_existing": 203,
+    "risk_sectors_existing": 290
+  }
+}
