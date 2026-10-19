@@ -33,7 +33,13 @@ import {
   CheckCircle,
   HelpCircle,
   Info,
+  Globe,
+  Save,
+  X,
 } from 'lucide-react'
+import { RecordAttachmentsTab } from '@/components/defesa-civil/RecordAttachmentsTab'
+import { getGoogleEarthUrl } from '@/lib/kml-export'
+import { auditLogService } from '@/services/defesa-civil'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -138,6 +144,12 @@ export const OccurrencesPage: React.FC = () => {
   const [selectedOccurrence, setSelectedOccurrence] = useState<Occurrence | null>(null)
   const [isPrintModalOpen, setIsPrintModalOpen] = useState(false)
   const [currentMunicipality, setCurrentMunicipality] = useState<Municipality | null>(null)
+
+  // Modo de Edição Explícita de Coordenadas na Ficha
+  const [isEditingCoordsInDetail, setIsEditingCoordsInDetail] = useState(false)
+  const [editOccLat, setEditOccLat] = useState('')
+  const [editOccLon, setEditOccLon] = useState('')
+  const [isSavingOccCoords, setIsSavingOccCoords] = useState(false)
 
   // Files of selected occurrence
   const [currentFiles, setCurrentFiles] = useState<OccurrenceFile[]>([])
@@ -267,7 +279,48 @@ export const OccurrencesPage: React.FC = () => {
   const openDetailModal = (occ: Occurrence) => {
     setSelectedOccurrence(occ)
     setIsDetailOpen(true)
+    setIsEditingCoordsInDetail(false)
+    setEditOccLat(occ.latitude !== undefined ? occ.latitude.toString() : '')
+    setEditOccLon(occ.longitude !== undefined ? occ.longitude.toString() : '')
     loadOccurrenceFiles(occ.id)
+  }
+
+  const handleSaveOccCoords = async () => {
+    if (!selectedOccurrence) return
+    setIsSavingOccCoords(true)
+    try {
+      const lat = editOccLat ? parseFloat(editOccLat) : undefined
+      const lon = editOccLon ? parseFloat(editOccLon) : undefined
+
+      const updated = await occurrencesService.update(selectedOccurrence.id, {
+        latitude: lat,
+        longitude: lon,
+        location_origin: 'mapa',
+      })
+
+      await auditLogService.create({
+        action: 'update',
+        resource: 'occurrences',
+        record_id: selectedOccurrence.id,
+        details: `Ajuste explícito de coordenadas da ocorrência ${selectedOccurrence.code}: [${selectedOccurrence.latitude || '—'}, ${selectedOccurrence.longitude || '—'}] -> [${lat || '—'}, ${lon || '—'}]`,
+      })
+
+      setSelectedOccurrence(updated)
+      setIsEditingCoordsInDetail(false)
+      toast({
+        title: 'Coordenadas atualizadas com sucesso',
+        description: 'A nova posição foi gravada e vinculada à ocorrência.',
+      })
+      loadData()
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao salvar coordenadas',
+        description: err.message || 'Sem autorização para alterar esta ocorrência.',
+      })
+    } finally {
+      setIsSavingOccCoords(false)
+    }
   }
 
   const DRAFT_STORAGE_KEY = `defesa_civil_draft_occurrence_${user?.id || 'anon'}`
@@ -1291,10 +1344,10 @@ export const OccurrencesPage: React.FC = () => {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded">
-                        {selectedOccurrence.code || 'SEM CÓDIGO'}
+                      <span className="font-mono text-sm font-bold text-red-700 bg-red-50 border border-red-200 px-2.5 py-0.5 rounded">
+                        {selectedOccurrence.code}
                       </span>
-                      <DialogTitle className="text-base font-bold text-slate-900 leading-tight">
+                      <DialogTitle className="text-base font-bold text-slate-900">
                         {selectedOccurrence.title}
                       </DialogTitle>
                     </div>
@@ -1308,9 +1361,39 @@ export const OccurrencesPage: React.FC = () => {
                     </p>
                   </div>
                 </div>
+
+                {/* Ações de Topo: Google Earth + Voltar ao Mapa */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {selectedOccurrence.latitude !== undefined &&
+                    selectedOccurrence.longitude !== undefined && (
+                      <a
+                        href={getGoogleEarthUrl(
+                          selectedOccurrence.latitude,
+                          selectedOccurrence.longitude,
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="h-8 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-md text-xs font-medium flex items-center gap-1 transition-colors"
+                        title="Abrir no Google Earth Web"
+                      >
+                        <Globe className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="hidden sm:inline">Google Earth</span>
+                      </a>
+                    )}
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={() => {
+                      setIsDetailOpen(false)
+                      navigate('/')
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm h-8"
+                  >
+                    Voltar ao mapa
+                  </Button>
+                </div>
               </div>
             </DialogHeader>
-
             <div className="space-y-4 text-xs py-2">
               {/* Badges strip */}
               <div className="flex flex-wrap items-center gap-2 p-3 bg-slate-50 rounded-lg border border-slate-200">
@@ -1353,124 +1436,24 @@ export const OccurrencesPage: React.FC = () => {
                 </p>
               </div>
 
-              {/* Anexos: Fotos e Documentos (Upload + Visualização) */}
-              <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+              {/* Fotos, Vídeos e Documentos Técnicos da Ocorrência */}
+              <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-2">
                 <div className="flex items-center justify-between">
                   <Label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
                     <ImageIcon className="w-4 h-4 text-blue-600" />
-                    Anexos e Fotos de Campo ({currentFiles.length})
+                    Fotos, Vídeos e Documentos da Ocorrência
                   </Label>
-
-                  <div className="flex items-center gap-2">
-                    {/* Botão Câmera Celular (PWA) */}
-                    <input
-                      type="file"
-                      accept="image/*"
-                      capture="environment"
-                      ref={cameraInputRef}
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={isUploadingFile}
-                      onClick={() => cameraInputRef.current?.click()}
-                      className="text-[11px] h-7 bg-white text-slate-700"
-                      title="Tirar foto na câmera"
-                    >
-                      <Camera className="w-3.5 h-3.5 mr-1 text-blue-600" />
-                      Câmera
-                    </Button>
-
-                    {/* Botão Galeria / Arquivo */}
-                    <input
-                      type="file"
-                      ref={fileInputRef}
-                      onChange={handleFileUpload}
-                      className="hidden"
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={isUploadingFile}
-                      onClick={() => fileInputRef.current?.click()}
-                      className="text-[11px] h-7 bg-white text-slate-700"
-                      title="Enviar arquivo ou foto do dispositivo"
-                    >
-                      <Paperclip className="w-3.5 h-3.5 mr-1 text-slate-600" />
-                      Anexar Arquivo
-                    </Button>
-                  </div>
+                  <span className="text-[10px] text-slate-500">
+                    Acervo técnico vinculado ao identificador único
+                  </span>
                 </div>
 
-                {isLoadingFiles ? (
-                  <div className="py-4 text-center text-slate-400">
-                    <Loader2 className="w-4 h-4 animate-spin mx-auto" />
-                  </div>
-                ) : currentFiles.length === 0 ? (
-                  <p className="text-[11px] text-slate-500 py-2">
-                    Nenhuma foto ou documento anexado a esta ocorrência ainda.
-                  </p>
-                ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-                    {currentFiles.map((fileRec) => {
-                      const fileUrl = occurrenceFilesService.getFileUrl(fileRec, fileRec.file)
-                      const isImg =
-                        fileRec.file_type === 'foto' ||
-                        /\.(jpg|jpeg|png|webp|gif)$/i.test(fileRec.file)
-
-                      return (
-                        <div
-                          key={fileRec.id}
-                          className="group relative bg-white border border-slate-200 rounded-lg overflow-hidden flex flex-col"
-                        >
-                          {isImg ? (
-                            <a
-                              href={fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="block h-24 overflow-hidden bg-slate-100"
-                            >
-                              <img
-                                src={fileUrl}
-                                alt={fileRec.caption || 'Foto'}
-                                className="w-full h-full object-cover transition-transform group-hover:scale-105"
-                              />
-                            </a>
-                          ) : (
-                            <a
-                              href={fileUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="h-24 flex flex-col items-center justify-center p-2 text-slate-600 bg-slate-50 hover:bg-slate-100"
-                            >
-                              <FileText className="w-8 h-8 text-slate-400 mb-1" />
-                              <span className="text-[10px] font-medium text-center line-clamp-1">
-                                {fileRec.caption || fileRec.file}
-                              </span>
-                            </a>
-                          )}
-
-                          <div className="p-1.5 flex items-center justify-between bg-white text-[10px] border-t border-slate-100">
-                            <span className="text-slate-500 truncate max-w-[80px]">
-                              {fileRec.caption || 'Anexo'}
-                            </span>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => handleDeleteFile(fileRec.id)}
-                              className="w-5 h-5 text-slate-400 hover:text-red-600"
-                              title="Remover anexo"
-                            >
-                              <Trash2 className="w-3 h-3" />
-                            </Button>
-                          </div>
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                <RecordAttachmentsTab
+                  targetCollection="occurrences"
+                  targetId={selectedOccurrence.id}
+                  recordTitle={`${selectedOccurrence.code} - ${selectedOccurrence.title}`}
+                  canEdit={true}
+                />
               </div>
 
               {/* Seção Clara: Localização da Ocorrência */}
@@ -1558,7 +1541,90 @@ export const OccurrencesPage: React.FC = () => {
                       <span className="text-slate-400 italic">Coordenadas não informadas</span>
                     )}
                   </div>
+
+                  {!isEditingCoordsInDetail ? (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsEditingCoordsInDetail(true)}
+                      className="text-xs h-7 border-slate-300"
+                    >
+                      <Crosshair className="w-3.5 h-3.5 mr-1 text-slate-600" />
+                      Corrigir Coordenadas
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsEditingCoordsInDetail(false)}
+                      className="text-xs h-7 text-slate-600"
+                    >
+                      <X className="w-3.5 h-3.5 mr-1" />
+                      Cancelar
+                    </Button>
+                  )}
                 </div>
+
+                {/* Modo de Edição Explícita de Coordenadas da Ocorrência */}
+                {isEditingCoordsInDetail && (
+                  <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg space-y-2 mt-2">
+                    <p className="font-bold text-amber-950 flex items-center gap-1.5 text-xs">
+                      <Crosshair className="w-3.5 h-3.5 text-amber-700" />
+                      Modo de Edição Explícito — Ajuste de Posição
+                    </p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-[11px] font-semibold">Latitude</Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          value={editOccLat}
+                          onChange={(e) => setEditOccLat(e.target.value)}
+                          className="h-8 text-xs bg-white mt-0.5"
+                          placeholder="Ex: -23.654321"
+                        />
+                        <span className="text-[10px] text-slate-500">
+                          Atual: {selectedOccurrence.latitude || 'ausente'}
+                        </span>
+                      </div>
+                      <div>
+                        <Label className="text-[11px] font-semibold">Longitude</Label>
+                        <Input
+                          type="number"
+                          step="any"
+                          value={editOccLon}
+                          onChange={(e) => setEditOccLon(e.target.value)}
+                          className="h-8 text-xs bg-white mt-0.5"
+                          placeholder="Ex: -47.234567"
+                        />
+                        <span className="text-[10px] text-slate-500">
+                          Atual: {selectedOccurrence.longitude || 'ausente'}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-1 border-t border-amber-200">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsEditingCoordsInDetail(false)}
+                        disabled={isSavingOccCoords}
+                        className="h-7 text-xs"
+                      >
+                        Cancelar
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={handleSaveOccCoords}
+                        disabled={isSavingOccCoords}
+                        className="h-7 text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center gap-1"
+                      >
+                        <Save className="w-3 h-3" />
+                        {isSavingOccCoords ? 'Gravando...' : 'Salvar Coordenadas'}
+                      </Button>
+                    </div>
+                  </div>
+                )}
 
                 {/* Mapa Leaflet se houver coordenadas */}
                 {selectedOccurrence.latitude !== undefined &&

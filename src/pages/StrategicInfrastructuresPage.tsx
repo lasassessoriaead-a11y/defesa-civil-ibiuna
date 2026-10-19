@@ -17,7 +17,14 @@ import {
   XCircle,
   FileQuestion,
   Layers,
+  Edit,
+  Save,
+  X,
+  Globe,
+  Scale,
 } from 'lucide-react'
+import { RecordAttachmentsTab } from '@/components/defesa-civil/RecordAttachmentsTab'
+import { getGoogleEarthUrl } from '@/lib/kml-export'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -117,6 +124,19 @@ export const StrategicInfrastructuresPage: React.FC = () => {
   const [formInspStatus, setFormInspStatus] = useState<string>('em_dia')
   const [isSavingForm, setIsSavingForm] = useState(false)
 
+  // Modo de Edição Explícita na Ficha
+  const [isEditingInDetail, setIsEditingInDetail] = useState(false)
+  const [editDetailLat, setEditDetailLat] = useState('')
+  const [editDetailLon, setEditDetailLon] = useState('')
+  const [editDetailNeighborhood, setEditDetailNeighborhood] = useState('')
+  const [editDetailRefPoint, setEditDetailRefPoint] = useState('')
+  const [editDetailCondition, setEditDetailCondition] = useState('')
+  const [editDetailProblems, setEditDetailProblems] = useState('')
+  const [isSavingDetailEdit, setIsSavingDetailEdit] = useState(false)
+
+  // Painel de Conciliação 215 x 232
+  const [isConciliationOpen, setIsConciliationOpen] = useState(false)
+
   const municipalityId = user?.municipality || ''
 
   const loadData = async () => {
@@ -139,6 +159,13 @@ export const StrategicInfrastructuresPage: React.FC = () => {
     async (infra: StrategicInfrastructure, fromMapSource = false) => {
       setSelectedInfra(infra)
       setDetailNotFound(false)
+      setIsEditingInDetail(false)
+      setEditDetailLat(infra.latitude ? infra.latitude.toString() : '')
+      setEditDetailLon(infra.longitude ? infra.longitude.toString() : '')
+      setEditDetailNeighborhood(infra.neighborhood || '')
+      setEditDetailRefPoint(infra.reference_point || '')
+      setEditDetailCondition(infra.structural_condition || 'nao_avaliado')
+      setEditDetailProblems(infra.observed_problems || '')
       setIsDetailOpen(true)
       setIsLoadingDetails(true)
       setOpenedFromMap(fromMapSource)
@@ -270,6 +297,55 @@ export const StrategicInfrastructuresPage: React.FC = () => {
     }
   }
 
+  const handleSaveDetailEdit = async () => {
+    if (!selectedInfra) return
+    setIsSavingDetailEdit(true)
+    try {
+      const newLat = editDetailLat ? parseFloat(editDetailLat) : undefined
+      const newLon = editDetailLon ? parseFloat(editDetailLon) : undefined
+
+      const updateData: Partial<StrategicInfrastructure> = {
+        neighborhood: editDetailNeighborhood.trim(),
+        reference_point: editDetailRefPoint.trim(),
+        structural_condition: editDetailCondition as any,
+        observed_problems: editDetailProblems.trim(),
+      }
+
+      if (newLat !== undefined && newLon !== undefined) {
+        updateData.latitude = newLat
+        updateData.longitude = newLon
+        updateData.coordinate_status = 'valida'
+      }
+
+      const updated = await strategicInfrastructuresService.update(selectedInfra.id, updateData)
+
+      // Registrar auditoria
+      await auditLogService.create({
+        action: 'update',
+        resource: 'strategic_infrastructures',
+        record_id: selectedInfra.id,
+        details: `Edição técnica da infraestrutura ${selectedInfra.original_code}: coordenadas [${selectedInfra.latitude || '—'},${selectedInfra.longitude || '—'}] -> [${newLat || '—'},${newLon || '—'}]`,
+      })
+
+      toast({
+        title: 'Alterações salvas com sucesso',
+        description: 'Os dados da estrutura e as coordenadas foram atualizados.',
+      })
+
+      setSelectedInfra(updated)
+      setIsEditingInDetail(false)
+      loadData()
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao salvar alterações',
+        description: err.message || 'Sem permissão para editar.',
+      })
+    } finally {
+      setIsSavingDetailEdit(false)
+    }
+  }
+
   const handleSaveStructure = async () => {
     if (!formCode.trim()) {
       toast({ variant: 'destructive', title: 'Identificador obrigatório' })
@@ -340,6 +416,16 @@ export const StrategicInfrastructuresPage: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            onClick={() => setIsConciliationOpen(true)}
+            className="text-xs border-amber-300 bg-amber-50 text-amber-900 hover:bg-amber-100 flex items-center gap-1.5"
+            title="Ferramenta de Conciliação 215 x 232"
+          >
+            <Scale className="w-3.5 h-3.5 text-amber-700" />
+            Conciliação 215×232
+          </Button>
+
           <Link to="/pontes-conferencia">
             <Button
               variant="outline"
@@ -366,6 +452,22 @@ export const StrategicInfrastructuresPage: React.FC = () => {
             <Plus className="w-3.5 h-3.5 mr-1" />
             Nova Estrutura
           </Button>
+        </div>
+      </div>
+
+      {/* Alerta Institucional da Conciliação de Bases */}
+      <div className="p-3.5 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-2.5 text-xs text-amber-900">
+        <Scale className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+        <div>
+          <p className="font-semibold text-amber-950">
+            Diferença de 17 registros entre as bases; identidade e origem ainda não verificadas.
+          </p>
+          <p className="text-[11px] text-amber-800 mt-0.5">
+            O levantamento municipal catalogou 215 pontes e aduelas (todas preservadas e
+            auditáveis). A ferramenta de conciliação compara códigos originais, coordenadas e
+            localidades antes de incorporar futuros registros complementares, evitando cadastros
+            presumidos.
+          </p>
         </div>
       </div>
 
@@ -678,18 +780,180 @@ export const StrategicInfrastructuresPage: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Botão de retorno direto preservando estado do mapa */}
-                  <Button
-                    variant="default"
-                    size="sm"
-                    onClick={handleReturnToMap}
-                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0 shadow-sm"
-                  >
-                    <MapIcon className="w-3.5 h-3.5 mr-1.5" />
-                    Voltar ao mapa
-                  </Button>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {selectedInfra.latitude && selectedInfra.longitude && (
+                      <a
+                        href={getGoogleEarthUrl(selectedInfra.latitude, selectedInfra.longitude)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="h-8 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-md text-xs font-medium flex items-center gap-1 transition-colors"
+                        title="Abrir no Google Earth Web"
+                      >
+                        <Globe className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="hidden sm:inline">Google Earth</span>
+                      </a>
+                    )}
+
+                    {!isEditingInDetail ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsEditingInDetail(true)}
+                        className="h-8 text-xs font-medium border-slate-300"
+                      >
+                        <Edit className="w-3.5 h-3.5 mr-1 text-slate-600" />
+                        Editar Registro
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsEditingInDetail(false)}
+                        className="h-8 text-xs font-medium text-slate-600"
+                      >
+                        <X className="w-3.5 h-3.5 mr-1" />
+                        Cancelar Edição
+                      </Button>
+                    )}
+
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={handleReturnToMap}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm h-8"
+                    >
+                      <MapIcon className="w-3.5 h-3.5 mr-1.5" />
+                      Voltar ao mapa
+                    </Button>
+                  </div>
                 </div>
               </DialogHeader>
+
+              {/* Modo de Edição Explícito */}
+              {isEditingInDetail && (
+                <div className="p-4 bg-amber-50/70 border border-amber-300 rounded-lg space-y-3 text-xs">
+                  <div className="flex items-center justify-between border-b border-amber-200 pb-2">
+                    <span className="font-bold text-amber-950 flex items-center gap-1.5">
+                      <Edit className="w-4 h-4 text-amber-700" />
+                      Modo de Edição Explícito — Alterações em Revisão
+                    </span>
+                    <Badge
+                      variant="outline"
+                      className="bg-amber-100 text-amber-900 border-amber-300"
+                    >
+                      Pendente de Gravação
+                    </Badge>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-800">Latitude WGS84</Label>
+                      <Input
+                        type="number"
+                        step="any"
+                        value={editDetailLat}
+                        onChange={(e) => setEditDetailLat(e.target.value)}
+                        placeholder="Ex: -23.654321"
+                        className="mt-1 text-xs bg-white"
+                      />
+                      <span className="text-[10px] text-slate-500">
+                        Posição anterior: {selectedInfra.latitude || 'ausente'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-800">
+                        Longitude WGS84
+                      </Label>
+                      <Input
+                        type="number"
+                        step="any"
+                        value={editDetailLon}
+                        onChange={(e) => setEditDetailLon(e.target.value)}
+                        placeholder="Ex: -47.234567"
+                        className="mt-1 text-xs bg-white"
+                      />
+                      <span className="text-[10px] text-slate-500">
+                        Posição anterior: {selectedInfra.longitude || 'ausente'}
+                      </span>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-800">
+                        Bairro / Localidade
+                      </Label>
+                      <Input
+                        value={editDetailNeighborhood}
+                        onChange={(e) => setEditDetailNeighborhood(e.target.value)}
+                        className="mt-1 text-xs bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-800">
+                        Ponto de Referência
+                      </Label>
+                      <Input
+                        value={editDetailRefPoint}
+                        onChange={(e) => setEditDetailRefPoint(e.target.value)}
+                        className="mt-1 text-xs bg-white"
+                      />
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-800">
+                        Condição Estrutural
+                      </Label>
+                      <Select
+                        value={editDetailCondition}
+                        onValueChange={(val) => setEditDetailCondition(val)}
+                      >
+                        <SelectTrigger className="mt-1 text-xs bg-white h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="bom">Bom</SelectItem>
+                          <SelectItem value="regular">Regular</SelectItem>
+                          <SelectItem value="ruim">Ruim</SelectItem>
+                          <SelectItem value="critico">Crítico</SelectItem>
+                          <SelectItem value="nao_avaliado">Não Avaliado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-800">
+                        Problemas Observados
+                      </Label>
+                      <Input
+                        value={editDetailProblems}
+                        onChange={(e) => setEditDetailProblems(e.target.value)}
+                        className="mt-1 text-xs bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-amber-200">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsEditingInDetail(false)}
+                      disabled={isSavingDetailEdit}
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveDetailEdit}
+                      disabled={isSavingDetailEdit}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center gap-1.5"
+                    >
+                      <Save className="w-3.5 h-3.5" />
+                      {isSavingDetailEdit ? 'Salvando...' : 'Salvar Alterações'}
+                    </Button>
+                  </div>
+                </div>
+              )}
 
               {/* Informações Básicas em Destaque */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
@@ -747,7 +1011,7 @@ export const StrategicInfrastructuresPage: React.FC = () => {
                   </TabsTrigger>
                   <TabsTrigger value="fotos-docs" className="text-xs">
                     <Camera className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
-                    Fotos & Docs
+                    Fotos, Vídeos & Docs
                   </TabsTrigger>
                   <TabsTrigger value="ocorrencias" className="text-xs">
                     <AlertOctagon className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
@@ -972,19 +1236,8 @@ export const StrategicInfrastructuresPage: React.FC = () => {
                   )}
                 </TabsContent>
 
-                {/* Aba 3: Fotos e Documentos */}
-                <TabsContent value="fotos-docs" className="space-y-3 pt-2 text-xs">
-                  <div>
-                    <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
-                      <Camera className="w-4 h-4 text-blue-600" />
-                      Documentos & Acervo Fotográfico
-                    </h4>
-                    <p className="text-[11px] text-slate-500">
-                      Fotografias registradas em vistorias técnicas, relatórios e prancha original
-                      do levantamento
-                    </p>
-                  </div>
-
+                {/* Aba 3: Fotos, Vídeos e Documentos (Universal com upload múltiplo, player e PDFs) */}
+                <TabsContent value="fotos-docs" className="space-y-4 pt-2 text-xs">
                   {/* Documento Original de Referência */}
                   <div className="p-3 bg-indigo-50/60 rounded-lg border border-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                     <div>
@@ -1008,79 +1261,13 @@ export const StrategicInfrastructuresPage: React.FC = () => {
                     </Button>
                   </div>
 
-                  {/* Galeria de Fotos das Vistorias e Demandas */}
-                  {inspections.some((i) => Boolean(i.photo)) ||
-                  relatedDemands.some((d) => Boolean(d.photos)) ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                      {inspections
-                        .filter((i) => Boolean(i.photo))
-                        .map((insp) => {
-                          const photoFilename = Array.isArray(insp.photo)
-                            ? insp.photo[0]
-                            : (insp.photo as unknown as string)
-                          if (!photoFilename) return null
-                          const photoUrl = pb.files.getURL(insp, photoFilename)
-                          return (
-                            <div
-                              key={insp.id}
-                              className="border rounded-lg overflow-hidden bg-white shadow-sm"
-                            >
-                              <img
-                                src={photoUrl}
-                                alt="Foto da Vistoria"
-                                className="w-full h-36 object-cover hover:scale-105 transition-transform cursor-pointer"
-                                onClick={() => window.open(photoUrl, '_blank')}
-                              />
-                              <div className="p-2 text-[11px] text-slate-600">
-                                <p className="font-semibold text-slate-800">Vistoria Técnica</p>
-                                <p>
-                                  {insp.inspection_date
-                                    ? new Date(insp.inspection_date).toLocaleDateString('pt-BR')
-                                    : ''}
-                                </p>
-                              </div>
-                            </div>
-                          )
-                        })}
-                      {relatedDemands
-                        .filter((d) => Boolean(d.photos))
-                        .map((dem) => {
-                          const photoFilename = Array.isArray(dem.photos)
-                            ? dem.photos[0]
-                            : (dem.photos as unknown as string)
-                          if (!photoFilename) return null
-                          const photoUrl = pb.files.getURL(dem, photoFilename)
-                          return (
-                            <div
-                              key={dem.id}
-                              className="border rounded-lg overflow-hidden bg-white shadow-sm"
-                            >
-                              <img
-                                src={photoUrl}
-                                alt="Foto da Demanda"
-                                className="w-full h-36 object-cover hover:scale-105 transition-transform cursor-pointer"
-                                onClick={() => window.open(photoUrl, '_blank')}
-                              />
-                              <div className="p-2 text-[11px] text-slate-600">
-                                <p className="font-semibold text-slate-800">Demanda Externa</p>
-                                <p className="truncate">{dem.title}</p>
-                              </div>
-                            </div>
-                          )
-                        })}
-                    </div>
-                  ) : (
-                    <div className="p-6 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-center space-y-2">
-                      <Camera className="w-8 h-8 text-slate-400 mx-auto" />
-                      <p className="text-slate-600 font-medium">
-                        Nenhuma fotografia anexada diretamente nas vistorias desta estrutura.
-                      </p>
-                      <p className="text-slate-400 text-[11px]">
-                        Ao cadastrar novas vistorias técnicas, você pode anexar fotos das
-                        cabeceiras, vigas e calha.
-                      </p>
-                    </div>
-                  )}
+                  {/* Componente Universal de Anexos */}
+                  <RecordAttachmentsTab
+                    targetCollection="strategic_infrastructures"
+                    targetId={selectedInfra.id}
+                    recordTitle={`${selectedInfra.original_code} (${selectedInfra.neighborhood || ''})`}
+                    canEdit={true}
+                  />
                 </TabsContent>
 
                 {/* Aba 4: Ocorrências e Demandas Vinculadas */}
@@ -1258,6 +1445,78 @@ export const StrategicInfrastructuresPage: React.FC = () => {
               {isSubmittingInspection ? 'Salvando...' : 'Gravar Vistoria'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* Modal de Conciliação 215 x 232 */}
+      <Dialog open={isConciliationOpen} onOpenChange={setIsConciliationOpen}>
+        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-base text-slate-900">
+              <Scale className="w-5 h-5 text-amber-600" />
+              Ferramenta de Conciliação de Bases (215 × 232 Infraestruturas)
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 text-xs">
+            <div className="p-3 bg-amber-50 border border-amber-300 rounded-lg text-amber-950 space-y-1.5">
+              <p className="font-bold">
+                "Diferença de 17 registros entre as bases; identidade e origem ainda não
+                verificadas."
+              </p>
+              <p className="text-[11px] text-amber-800 leading-relaxed">
+                A base municipal atual conta com exatamente <strong>215 infraestruturas</strong>{' '}
+                conferidas e validadas a partir do documento técnico original (100% das 5 páginas do
+                arquivo PDF). Registros adicionais da planilha de 232 itens não foram incorporados
+                presumidamente para evitar duplicações ou coordenadas incorretas.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="p-3 bg-slate-50 border rounded-lg">
+                <p className="font-semibold text-slate-700">Base Ativa no Sistema</p>
+                <p className="text-xl font-bold text-slate-900 mt-1">215 estruturas</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Pontes e Aduelas com códigos originais preservados
+                </p>
+              </div>
+
+              <div className="p-3 bg-slate-50 border rounded-lg">
+                <p className="font-semibold text-slate-700">Base Referencial Complementar</p>
+                <p className="text-xl font-bold text-slate-900 mt-1">232 estruturas</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  17 registros pendentes de verificação de identidade técnica
+                </p>
+              </div>
+            </div>
+
+            <div className="border rounded-lg p-3 space-y-2 bg-white">
+              <h4 className="font-bold text-slate-800">Diretrizes de Conciliação Técnica:</h4>
+              <ul className="list-disc pl-5 space-y-1 text-slate-600 text-[11px]">
+                <li>
+                  Comparar códigos originais (ex: <code>P Gabri</code>, <code>P117-A</code>,{' '}
+                  <code>P158/2</code>).
+                </li>
+                <li>
+                  Verificar se os 17 itens constituem desdobramentos de vão duplo, aduelas geminadas
+                  ou novas obras municipais.
+                </li>
+                <li>
+                  Não criar cadastros presumidos sem comprovação documental ou coordenadas de GPS
+                  conferidas.
+                </li>
+                <li>
+                  Preservar todo o histórico de vistorias e fotos já vinculados às 215 estruturas
+                  existentes.
+                </li>
+              </ul>
+            </div>
+
+            <div className="flex justify-end pt-2 border-t">
+              <Button size="sm" variant="outline" onClick={() => setIsConciliationOpen(false)}>
+                Fechar
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

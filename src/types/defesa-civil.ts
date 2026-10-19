@@ -680,3 +680,52 @@ export interface WhatsAppConfigInfo {
   whatsapp_number: string
   webhook_url: string
 }
+
+export type AttachmentCategory =
+  | 'vistoria'
+  | 'situacao_inicial'
+  | 'antes_intervencao'
+  | 'durante_obra'
+  | 'depois_conclusao'
+  | 'outros'
+
+export type AttachmentMediaType = 'foto' | 'video' | 'documento' | 'outro'
+
+export interface RecordAttachment extends RecordModel {
+  municipality: string
+  target_collection: string
+  target_id: string
+  file: string
+  title?: string
+  description?: string
+  capture_date?: string
+  author_name?: string
+  category: AttachmentCategory
+  media_type: AttachmentMediaType
+  file_size?: number
+  uploaded_by?: string
+  expand?: {
+    uploaded_by?: User
+    municipality?: Municipality
+  }
+}
+
+export type GeoAdjustVersionType = 'ajuste_municipal' | 'pendente_validacao' | 'restaurado_original'
+
+export interface MunicipalGeoAdjustment extends RecordModel {
+  municipality: string
+  target_collection: string
+  target_id: string
+  code?: string
+  version_type: GeoAdjustVersionType
+  original_geometry_geojson?: string
+  adjusted_geometry_geojson?: string
+  original_risk_level?: string
+  adjusted_risk_level?: string
+  justification: string
+  author?: string
+  author_name?: string
+  expand?: {
+    author?: User
+  }
+}

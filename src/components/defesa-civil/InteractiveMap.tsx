@@ -28,7 +28,11 @@ import {
   Maximize2,
   Trash2,
   MapPin,
+  Globe,
+  ExternalLink,
+  Download,
 } from 'lucide-react'
+import { getGoogleEarthUrl, generateKmlDocument, downloadKmlFile } from '@/lib/kml-export'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import pb from '@/lib/pocketbase/client'
@@ -395,6 +399,19 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [riskFilter, setRiskFilter] = useState<'all' | 'R1' | 'R2' | 'R3' | 'R4'>(
     initialLayers?.riskFilter || 'all',
   )
+  // Base map mode: 'map' (OpenStreetMap) | 'satellite' (Esri World Imagery) | 'hybrid' (Esri + Reference/Labels)
+  const [baseMapMode, setBaseMapMode] = useState<'map' | 'satellite' | 'hybrid'>(() => {
+    return (localStorage.getItem('ibiuna_base_map_mode') as any) || 'map'
+  })
+
+  const handleBaseMapChange = (mode: 'map' | 'satellite' | 'hybrid') => {
+    setBaseMapMode(mode)
+    try {
+      localStorage.setItem('ibiuna_base_map_mode', mode)
+    } catch {
+      /* intentionally ignored */
+    }
+  }
 
   // Report layer toggles to parent if callback provided
   useEffect(() => {
@@ -543,11 +560,86 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     return [-23.5505, -46.6333]
   }, [center])
 
+  const handleExportKml = () => {
+    const kml = generateKmlDocument({
+      infrastructures: strategicInfrastructures,
+      occurrences,
+      riskSectors: geoRiskSectors,
+      dangerStretches: geoDangerStretches,
+    })
+    downloadKmlFile(kml, `defesa_civil_ibiuna_${Date.now()}.kml`)
+  }
+
   return (
     <div
       className="relative w-full rounded-xl overflow-hidden border border-slate-300 shadow-inner bg-slate-100 group"
       style={{ height }}
     >
+      {/* Barra superior de Controles de Base e Integrações (Mapa | Satélite | Híbrido + Google Earth / KML) */}
+      <div className="absolute top-2 left-2 z-[400] flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md p-1 rounded-lg border border-slate-300 shadow-md">
+        {/* Seletor de Base de Visualização */}
+        <div className="flex items-center rounded-md bg-slate-100 p-0.5 border border-slate-200">
+          <button
+            type="button"
+            onClick={() => handleBaseMapChange('map')}
+            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+              baseMapMode === 'map'
+                ? 'bg-white text-slate-900 shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Mapa
+          </button>
+          <button
+            type="button"
+            onClick={() => handleBaseMapChange('satellite')}
+            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+              baseMapMode === 'satellite'
+                ? 'bg-blue-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Satélite
+          </button>
+          <button
+            type="button"
+            onClick={() => handleBaseMapChange('hybrid')}
+            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+              baseMapMode === 'hybrid'
+                ? 'bg-indigo-600 text-white shadow-xs'
+                : 'text-slate-600 hover:text-slate-900'
+            }`}
+          >
+            Híbrido
+          </button>
+        </div>
+
+        {/* Integração Google Earth KML */}
+        <div className="flex items-center gap-1 border-l border-slate-200 pl-1.5">
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleExportKml}
+            className="h-6 px-2 text-[11px] font-medium text-slate-700 bg-white hover:bg-slate-50 border-slate-300 flex items-center gap-1"
+            title="Exportar camadas visíveis em formato KML/KMZ para Google Earth. Nota: Não sincroniza automaticamente edições com o sistema."
+          >
+            <Download className="w-3 h-3 text-slate-600" />
+            Exportar KML
+          </Button>
+
+          <a
+            href={getGoogleEarthUrl(validCenter[0], validCenter[1])}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="h-6 px-2 text-[11px] font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-md flex items-center gap-1 transition-colors"
+            title="Abrir o centro atual no Google Earth Web. Nota: Não sincroniza automaticamente edições."
+          >
+            <Globe className="w-3 h-3 text-blue-600" />
+            <span className="hidden md:inline">Google Earth</span>
+            <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
+          </a>
+        </div>
+      </div>
       {/* Real Interactive Leaflet OpenStreetMap */}
       <MapContainer
         center={validCenter}
@@ -556,12 +648,28 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
         style={{ height: '100%', width: '100%' }}
         zoomControl={false}
       >
-        {/* OpenStreetMap standard tiles (Fast, public, free, no API key needed) */}
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          maxZoom={19}
-        />
+        {/* Base Map Layer: OpenStreetMap, Esri Satellite or Hybrid */}
+        {baseMapMode === 'map' && (
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            maxZoom={19}
+          />
+        )}
+        {(baseMapMode === 'satellite' || baseMapMode === 'hybrid') && (
+          <TileLayer
+            attribution="Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+            maxZoom={19}
+          />
+        )}
+        {baseMapMode === 'hybrid' && (
+          <TileLayer
+            attribution="Labels &copy; Esri"
+            url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
+            maxZoom={19}
+          />
+        )}
 
         {/* View controller & Click event listeners */}
         <MapViewController center={validCenter} zoom={zoom} />
@@ -682,20 +790,46 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   click: () => onSelectItem?.('occurrence', occ),
                 }}
               >
+                <Tooltip direction="top" offset={[0, -14]} opacity={0.95}>
+                  <span className="font-semibold text-xs text-slate-900">
+                    {occ.title || occ.code || 'Ocorrência'}
+                  </span>
+                </Tooltip>
                 <Popup>
-                  <div className="p-1 min-w-[220px]">
-                    <div className="flex items-center gap-1.5 font-bold text-slate-900 text-sm">
-                      {getHazardIcon(occ.type, 'w-4 h-4')}
-                      <span>{occ.title}</span>
+                  <div className="p-1 min-w-[230px]">
+                    <div className="flex items-center justify-between border-b pb-1 font-bold text-slate-900 text-xs">
+                      <div className="flex items-center gap-1.5">
+                        {getHazardIcon(occ.type, 'w-4 h-4')}
+                        <span>{occ.title}</span>
+                      </div>
+                      <SeverityBadge severity={occ.severity} />
                     </div>
                     <p className="text-xs text-slate-600 mt-1 line-clamp-2">
                       {occ.description || 'Sem descrição detalhada.'}
                     </p>
-                    <div className="mt-2 pt-1 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <SeverityBadge severity={occ.severity} />
-                      <span className="text-[11px] text-slate-500 truncate max-w-[120px]">
-                        {occ.address}
-                      </span>
+                    <div className="mt-2 pt-1 border-t border-slate-100 text-xs text-slate-500 truncate">
+                      {occ.address || 'Endereço não informado'}
+                    </div>
+                    <div className="pt-2 border-t mt-1.5 flex flex-col gap-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onSelectItem?.('occurrence', occ)
+                          navigate(`/ocorrencias?id=${encodeURIComponent(occ.id)}`)
+                        }}
+                        className="w-full px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
+                      >
+                        Abrir Ficha da Ocorrência
+                      </button>
+                      <a
+                        href={getGoogleEarthUrl(occ.latitude, occ.longitude)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-medium flex items-center justify-center gap-1 transition-colors"
+                      >
+                        <Globe className="w-3 h-3 text-blue-600" />
+                        Ver no Google Earth
+                      </a>
                     </div>
                   </div>
                 </Popup>
@@ -873,14 +1007,26 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                         <strong>Problema:</strong> {infra.problems_reported}
                       </p>
                     )}
-                    <div className="pt-1.5 border-t mt-1">
+                    <div className="pt-1.5 border-t mt-1 flex flex-col gap-1">
                       <button
                         type="button"
-                        onClick={() => onSelectItem?.('infrastructure', infra)}
+                        onClick={() => {
+                          onSelectItem?.('infrastructure', infra)
+                          navigate(`/infraestruturas?id=${encodeURIComponent(infra.id)}`)
+                        }}
                         className="w-full px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
                       >
                         Abrir Ficha da Infraestrutura
                       </button>
+                      <a
+                        href={getGoogleEarthUrl(infra.latitude, infra.longitude)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full px-2 py-0.5 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[10px] font-medium flex items-center justify-center gap-1 transition-colors"
+                      >
+                        <Globe className="w-3 h-3 text-blue-600" />
+                        Ver no Google Earth
+                      </a>
                     </div>
                   </div>
                 </Popup>
@@ -1154,6 +1300,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                         },
                       }}
                     >
+                      <Tooltip direction="top" opacity={0.95}>
+                        <span className="font-semibold text-xs text-slate-900">
+                          {stretch.code || 'Trecho IPT'}
+                          {stretch.location ? ` — ${stretch.location}` : ''}
+                        </span>
+                      </Tooltip>
                       <Popup>
                         <div className="p-1 min-w-[240px] text-xs space-y-1.5">
                           <div className="flex items-center justify-between border-b pb-1 font-bold">
@@ -1169,6 +1321,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                           <p className="text-slate-600">
                             <strong>Processo:</strong> {stretch.process_type || 'Enxurrada (ENX)'}
                           </p>
+                          {stretch.code?.includes('T01') && (
+                            <div className="bg-amber-50 border border-amber-300 p-1.5 rounded text-[11px] text-amber-900 font-medium">
+                              <strong>Aviso Técnico:</strong> Classificações distintas por segmento
+                              — P2 a montante / P4 a jusante. Pendente de conferência técnica.
+                            </div>
+                          )}
                           <p className="text-[10px] text-slate-500">
                             <strong>Fonte:</strong>{' '}
                             {stretch.import_source ||
@@ -1248,6 +1406,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                         },
                       }}
                     >
+                      <Tooltip direction="top" opacity={0.95}>
+                        <span className="font-semibold text-xs text-slate-900">
+                          {layer.code || layer.name || 'Trecho IPT'}
+                        </span>
+                      </Tooltip>
                       <Popup>
                         <div className="p-1 min-w-[240px] text-xs space-y-1.5">
                           <div className="flex items-center justify-between border-b pb-1 font-bold">
@@ -1257,6 +1420,12 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                           <p className="text-slate-600">
                             <strong>Trecho:</strong> {layer.code}
                           </p>
+                          {String(layer.code || layer.name).includes('T01') && (
+                            <div className="bg-amber-50 border border-amber-300 p-1.5 rounded text-[11px] text-amber-900 font-medium">
+                              <strong>Aviso Técnico:</strong> Classificações distintas por segmento
+                              — P2 a montante / P4 a jusante. Pendente de conferência técnica.
+                            </div>
+                          )}
                           <p className="text-[10px] text-slate-500">
                             <strong>Fonte:</strong>{' '}
                             {layer.source_file || 'IPT · Trechos_perigo.gpkg + síntese 29/11/2024'}

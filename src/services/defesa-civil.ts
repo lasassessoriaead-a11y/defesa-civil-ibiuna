@@ -981,3 +981,69 @@ export const geoLayersService = {
     return pb.collection('geo_layers').delete(id)
   },
 }
+
+// ----------------------------------------------------------------------
+// Record Attachments Service (Universal para todas as fichas técnicas)
+// ----------------------------------------------------------------------
+export const recordAttachmentsService = {
+  async listForRecord(targetCollection: string, targetId: string, category?: string) {
+    let filter = `target_collection = "${targetCollection}" && target_id = "${targetId}"`
+    if (category && category !== 'all') {
+      filter += ` && category = "${category}"`
+    }
+    return pb
+      .collection('record_attachments')
+      .getFullList<import('@/types/defesa-civil').RecordAttachment>({
+        filter,
+        sort: '-created',
+        expand: 'uploaded_by',
+        requestKey: null,
+      })
+  },
+  async get(id: string) {
+    return pb
+      .collection('record_attachments')
+      .getOne<import('@/types/defesa-civil').RecordAttachment>(id, {
+        expand: 'uploaded_by',
+        requestKey: null,
+      })
+  },
+  async upload(formData: FormData) {
+    return pb
+      .collection('record_attachments')
+      .create<import('@/types/defesa-civil').RecordAttachment>(formData)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').RecordAttachment>) {
+    return pb
+      .collection('record_attachments')
+      .update<import('@/types/defesa-civil').RecordAttachment>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('record_attachments').delete(id)
+  },
+  getFileUrl(record: { id: string; file: string }, filename?: string) {
+    if (!record || !record.file) return ''
+    return pb.files.getURL(record as any, filename || record.file)
+  },
+}
+
+// ----------------------------------------------------------------------
+// Municipal Geo Adjustments Service (Ajustes municipais com histórico e preservação)
+// ----------------------------------------------------------------------
+export const municipalGeoAdjustmentsService = {
+  async listForRecord(targetCollection: string, targetId: string) {
+    return pb
+      .collection('municipal_geo_adjustments')
+      .getFullList<import('@/types/defesa-civil').MunicipalGeoAdjustment>({
+        filter: `target_collection = "${targetCollection}" && target_id = "${targetId}"`,
+        sort: '-created',
+        expand: 'author',
+        requestKey: null,
+      })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').MunicipalGeoAdjustment>) {
+    return pb
+      .collection('municipal_geo_adjustments')
+      .create<import('@/types/defesa-civil').MunicipalGeoAdjustment>(data)
+  },
+}

@@ -22,7 +22,13 @@ import {
   SlidersHorizontal,
   Map as MapIcon,
   ExternalLink,
+  History,
+  Save,
+  Camera,
 } from 'lucide-react'
+import { RecordAttachmentsTab } from '@/components/defesa-civil/RecordAttachmentsTab'
+import { municipalGeoAdjustmentsService, auditLogService } from '@/services/defesa-civil'
+import type { MunicipalGeoAdjustment } from '@/types/defesa-civil'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -226,6 +232,9 @@ export const RiskSectorsPage: React.FC = () => {
   const openDetails = async (item: UnifiedRiskItem) => {
     setSelectedItem(item)
     setItemNotFound(false)
+    setIsEditingMunicipal(false)
+    setAdjustedRiskLevel(item.riskLevel || 'R2')
+    setAdjustmentJustification('')
     setIsDetailOpen(true)
     setIsLoadingOccs(true)
     try {
@@ -238,6 +247,7 @@ export const RiskSectorsPage: React.FC = () => {
     } finally {
       setIsLoadingOccs(false)
     }
+    loadAdjustmentsForRecord(item.kind, item.id)
   }
 
   // Observa ?id=... da URL para abrir a ficha do setor ou trecho pelo identificador único
@@ -408,6 +418,81 @@ export const RiskSectorsPage: React.FC = () => {
     }
     initFromUrl()
   }, [urlParamId, user?.municipality])
+
+  // Histórico de Ajustes Municipais e Edição Técnica de Risco/Geometria
+  const [adjustments, setAdjustments] = useState<MunicipalGeoAdjustment[]>([])
+  const [isLoadingAdjustments, setIsLoadingAdjustments] = useState(false)
+  const [isEditingMunicipal, setIsEditingMunicipal] = useState(false)
+  const [adjustedRiskLevel, setAdjustedRiskLevel] = useState('')
+  const [adjustmentJustification, setAdjustmentJustification] = useState('')
+  const [isSavingAdjustment, setIsSavingAdjustment] = useState(false)
+
+  const loadAdjustmentsForRecord = async (kind: 'sector' | 'stretch', id: string) => {
+    try {
+      setIsLoadingAdjustments(true)
+      const targetCol = kind === 'sector' ? 'risk_sectors' : 'danger_stretches'
+      const data = await municipalGeoAdjustmentsService.listForRecord(targetCol, id)
+      setAdjustments(data)
+    } catch (e) {
+      console.warn('Erro ao carregar ajustes municipais:', e)
+    } finally {
+      setIsLoadingAdjustments(false)
+    }
+  }
+
+  const handleSaveMunicipalAdjustment = async () => {
+    if (!selectedItem) return
+    if (!adjustmentJustification.trim()) {
+      toast({
+        variant: 'destructive',
+        title: 'Justificativa técnica obrigatória',
+        description: 'Informe o motivo do ajuste municipal com base em vistoria ou obra recente.',
+      })
+      return
+    }
+
+    setIsSavingAdjustment(true)
+    try {
+      const targetCol = selectedItem.kind === 'sector' ? 'risk_sectors' : 'danger_stretches'
+      await municipalGeoAdjustmentsService.create({
+        municipality: user?.municipality || '',
+        target_collection: targetCol,
+        target_id: selectedItem.id,
+        code: selectedItem.code,
+        version_type: 'ajuste_municipal',
+        original_risk_level: selectedItem.riskLevel,
+        adjusted_risk_level: adjustedRiskLevel || selectedItem.riskLevel,
+        justification: adjustmentJustification.trim(),
+        author: user?.id,
+        author_name: user?.name || 'Técnico Municipal',
+      })
+
+      // Registrar auditoria
+      await auditLogService.create({
+        action: 'update',
+        resource: targetCol,
+        record_id: selectedItem.id,
+        details: `Ajuste municipal registrado para ${selectedItem.code}: de ${selectedItem.riskLevel} para ${adjustedRiskLevel || selectedItem.riskLevel}. Justificativa: ${adjustmentJustification}`,
+      })
+
+      toast({
+        title: 'Ajuste municipal gravado em versão separada',
+        description: 'O estudo original do IPT permanece preservado intacto no banco de dados.',
+      })
+
+      setIsEditingMunicipal(false)
+      setAdjustmentJustification('')
+      loadAdjustmentsForRecord(selectedItem.kind, selectedItem.id)
+    } catch (err: any) {
+      toast({
+        variant: 'destructive',
+        title: 'Erro ao gravar ajuste municipal',
+        description: err.message || 'Sem autorização para alterar parâmetros técnicos.',
+      })
+    } finally {
+      setIsSavingAdjustment(false)
+    }
+  }
 
   // Filtragem
   const filtered = unifiedList.filter((item) => {
@@ -831,6 +916,25 @@ export const RiskSectorsPage: React.FC = () => {
                   </div>
                 </div>
 
+                {/* Alerta de Caso Especial T01 (Desdobramento P2 / P4) */}
+                {selectedItem.code?.includes('T01') && (
+                  <div className="p-3 bg-amber-50 border-2 border-amber-300 rounded-lg text-amber-950 space-y-1">
+                    <p className="font-bold flex items-center gap-1.5 text-xs">
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                      Aviso Técnico Oficial — Trecho T01 (Várzea do Rio Una / Área 01)
+                    </p>
+                    <p className="text-xs font-semibold text-amber-900">
+                      "Classificações distintas por segmento — P2 a montante / P4 a jusante.
+                      Pendente de conferência técnica."
+                    </p>
+                    <p className="text-[11px] text-amber-800">
+                      A geometria contínua do IPT abrange simultaneamente o registro montante (grau
+                      P2) e o registro jusante (grau P4). Ambos foram preservados no cadastro sem
+                      divisões arbitrárias ou perda de informação.
+                    </p>
+                  </div>
+                )}
+
                 {/* Localização Detalhada */}
                 <div className="p-3 bg-white rounded-lg border space-y-1">
                   <p className="font-bold text-slate-800">Localização e Endereço de Referência:</p>
@@ -875,79 +979,157 @@ export const RiskSectorsPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Documentos & Prancha do Mapeamento Oficial IPT */}
-                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                {/* Preservação do Estudo IPT x Ajustes Municipais */}
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-3">
                   <div className="flex items-center justify-between">
-                    <p className="font-bold text-slate-800 flex items-center gap-1.5">
-                      <FileText className="w-3.5 h-3.5 text-blue-600" />
-                      Documentos & Pranchas Relacionadas (IPT 2024)
-                    </p>
-                    <span className="text-[10px] text-slate-500">
-                      Vínculo estrito por código documental
-                    </span>
-                  </div>
-
-                  <div className="space-y-1.5 text-[11px]">
-                    <div className="p-2 bg-white rounded border flex items-center justify-between">
-                      <div>
-                        <span className="font-semibold text-slate-900">
-                          {selectedItem.plateNumber
-                            ? `Prancha Técnica Oficial IPT: ${selectedItem.plateNumber}`
-                            : 'Prancha Técnica IPT · Cartografia de Campo'}
-                        </span>
-                        <p className="text-slate-500 text-[10px] mt-0.5">
-                          IPT · Mapeamento de Áreas de Risco e Perigo de Ibiúna/SP (Síntese
-                          29/11/2024)
-                        </p>
-                      </div>
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 text-[10px]">
-                        Oficial IPT
-                      </Badge>
+                    <div>
+                      <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
+                        <History className="w-4 h-4 text-indigo-600" />
+                        Preservação IPT & Histórico de Ajustes Municipais
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        O estudo original do IPT é intocável. Ajustes municipais de reclassificação
+                        pós-obra são registrados em camada separada com autor e data.
+                      </p>
                     </div>
 
-                    <p className="text-[10px] text-slate-400 italic pt-1">
-                      Regra de integridade: relatórios e pranchas são vinculados exclusivamente por
-                      código documental correspondente ou feição geográfica confirmada, sem
-                      associações numéricas arbitrárias. Acervo do IPT não se mistura com
-                      fotografias operacionais de pontes.
-                    </p>
+                    {!isEditingMunicipal ? (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsEditingMunicipal(true)}
+                        className="text-xs h-7"
+                      >
+                        Registrar Ajuste Municipal
+                      </Button>
+                    ) : (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setIsEditingMunicipal(false)}
+                        className="text-xs h-7 text-slate-600"
+                      >
+                        Cancelar
+                      </Button>
+                    )}
                   </div>
-                </div>
 
-                {/* Ocorrências Operacionais Registradas (Separadas de CadEv Histórico) */}
-                <div className="p-3 bg-white rounded-lg border space-y-2">
-                  <div className="flex items-center justify-between">
-                    <p className="font-bold text-slate-800">
-                      Ocorrências Operacionais Vinculadas ({relatedOccurrences.length})
-                    </p>
-                    <span className="text-[10px] text-slate-500">
-                      Ocorrências 199/campo vinculadas por georreferenciamento
-                    </span>
-                  </div>
+                  {/* Formulário de Ajuste Municipal */}
+                  {isEditingMunicipal && (
+                    <div className="p-3 bg-white border border-indigo-200 rounded-lg space-y-2.5">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="font-semibold text-slate-700 block text-[11px]">
+                            Grau de Risco Ajustado
+                          </label>
+                          <select
+                            value={adjustedRiskLevel}
+                            onChange={(e) => setAdjustedRiskLevel(e.target.value)}
+                            className="w-full text-xs bg-slate-50 border rounded px-2 py-1 mt-1"
+                          >
+                            <option value="R1">R1 - Baixo</option>
+                            <option value="R2">R2 - Médio</option>
+                            <option value="R3">R3 - Alto</option>
+                            <option value="R4">R4 - Muito Alto</option>
+                          </select>
+                        </div>
 
-                  {isLoadingOccs ? (
-                    <p className="text-slate-400 italic">Buscando ocorrências vinculadas...</p>
-                  ) : relatedOccurrences.length === 0 ? (
-                    <p className="text-slate-500 italic text-[11px]">
-                      Nenhuma ocorrência operacional do 199 vinculada a este setor/trecho até o
-                      momento.
-                    </p>
-                  ) : (
-                    <div className="space-y-1">
-                      {relatedOccurrences.map((occ) => (
-                        <div
-                          key={occ.id}
-                          className="p-2 bg-slate-50 rounded border flex items-center justify-between"
-                        >
-                          <div>
-                            <span className="font-semibold text-slate-900">{occ.title}</span>
-                            <span className="text-slate-500 ml-2">({occ.code})</span>
+                        <div>
+                          <label className="font-semibold text-slate-700 block text-[11px]">
+                            Referência Original IPT
+                          </label>
+                          <div className="mt-1 text-xs px-2 py-1 bg-slate-100 rounded text-slate-700 font-bold">
+                            {selectedItem.riskLevel} (Original IPT Intacto)
                           </div>
-                          <Badge variant="outline">{occ.severity}</Badge>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="font-semibold text-slate-700 block text-[11px]">
+                          Justificativa Técnica da Alteração (Obrigatória)
+                        </label>
+                        <textarea
+                          placeholder="Informe obra de contenção executada, nova vistoria ou canalização..."
+                          value={adjustmentJustification}
+                          onChange={(e) => setAdjustmentJustification(e.target.value)}
+                          className="w-full text-xs p-2 border rounded mt-1 bg-slate-50"
+                          rows={2}
+                        />
+                      </div>
+
+                      <div className="flex justify-end gap-2 pt-1 border-t">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => setIsEditingMunicipal(false)}
+                          disabled={isSavingAdjustment}
+                        >
+                          Cancelar
+                        </Button>
+                        <Button
+                          size="sm"
+                          onClick={handleSaveMunicipalAdjustment}
+                          disabled={isSavingAdjustment}
+                          className="bg-indigo-600 hover:bg-indigo-700 text-white font-semibold flex items-center gap-1"
+                        >
+                          <Save className="w-3.5 h-3.5" />
+                          {isSavingAdjustment ? 'Gravando...' : 'Gravar Ajuste Municipal'}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Lista de Ajustes Anteriores */}
+                  {isLoadingAdjustments ? (
+                    <p className="text-slate-400 italic text-[11px]">Carregando histórico...</p>
+                  ) : adjustments.length === 0 ? (
+                    <div className="p-2 bg-white rounded border text-[11px] text-slate-500">
+                      Nenhum ajuste municipal gravado. Vigora a classificação original do IPT (100%
+                      oficial).
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {adjustments.map((adj) => (
+                        <div
+                          key={adj.id}
+                          className="p-2 bg-white border border-slate-200 rounded text-[11px] space-y-1"
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="font-semibold text-indigo-900">
+                              Ajuste: {adj.original_risk_level} ➔ {adj.adjusted_risk_level}
+                            </span>
+                            <span className="text-[10px] text-slate-400">
+                              {new Date(adj.created).toLocaleDateString('pt-BR')} por{' '}
+                              {adj.author_name || 'Técnico'}
+                            </span>
+                          </div>
+                          <p className="text-slate-600">{adj.justification}</p>
                         </div>
                       ))}
                     </div>
                   )}
+                </div>
+
+                {/* Aba de Fotos, Vídeos e Documentos Técnicos da Área de Risco */}
+                <div className="p-3 bg-white rounded-lg border space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-indigo-600" />
+                      Fotos, Vídeos e Documentos Técnicos da Área
+                    </p>
+                    <span className="text-[10px] text-slate-500">
+                      Armazenamento isolado por setor/trecho
+                    </span>
+                  </div>
+
+                  <RecordAttachmentsTab
+                    targetCollection={
+                      selectedItem.kind === 'sector' ? 'risk_sectors' : 'danger_stretches'
+                    }
+                    targetId={selectedItem.id}
+                    recordTitle={`${selectedItem.code} (${selectedItem.location || selectedItem.areaName || ''})`}
+                    canEdit={true}
+                  />
                 </div>
               </div>
 
