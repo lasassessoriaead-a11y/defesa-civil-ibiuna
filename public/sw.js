@@ -1,5 +1,5 @@
 /* Service Worker for Defesa Civil Municipal PWA */
-const CACHE_VERSION = 'defesa-civil-v2'
+const CACHE_VERSION = 'defesa-civil-v0.0.32'
 const STATIC_CACHE = `defesa-civil-static-${CACHE_VERSION}`
 const RUNTIME_CACHE = `defesa-civil-runtime-${CACHE_VERSION}`
 

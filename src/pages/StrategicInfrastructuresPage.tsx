@@ -54,6 +54,7 @@ import {
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Label } from '@/components/ui/label'
 import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
@@ -62,6 +63,7 @@ import {
   bridgeInspectionsService,
   occurrencesService,
   externalDemandsService,
+  auditLogService,
 } from '@/services/defesa-civil'
 import type {
   StrategicInfrastructure,
@@ -197,7 +199,7 @@ export const StrategicInfrastructuresPage: React.FC = () => {
     // Limpa a query string
     setSearchParams({}, { replace: true })
     // Retorna para o mapa no dashboard; InteractiveMap restaura automaticamente centro, zoom e camadas
-    navigate('/', { replace: false })
+    navigate('/painel', { replace: false })
   }
 
   const handleCloseDetailDialog = (open: boolean) => {

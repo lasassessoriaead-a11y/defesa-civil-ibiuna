@@ -413,9 +413,20 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     }
   }
 
-  // Report layer toggles to parent if callback provided
+  // Ref para estabilizar o callback onLayersChange e evitar loops de re-renderização
+  const onLayersChangeRef = useRef(onLayersChange)
   useEffect(() => {
-    onLayersChange?.({
+    onLayersChangeRef.current = onLayersChange
+  }, [onLayersChange])
+
+  // Notifica o callback pai apenas quando as opções de camadas realmente mudam (ignora montagem inicial)
+  const isInitialLayersMount = useRef(true)
+  useEffect(() => {
+    if (isInitialLayersMount.current) {
+      isInitialLayersMount.current = false
+      return
+    }
+    onLayersChangeRef.current?.({
       showOccurrences,
       showInfrastructures,
       showAreas,
@@ -448,7 +459,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     showPhotosGeo,
     showCadEvGeo,
     riskFilter,
-    onLayersChange,
   ])
 
   // Camadas dinâmicas do banco de dados (geo_layers e geometrias vinculadas de risk_sectors/danger_stretches)

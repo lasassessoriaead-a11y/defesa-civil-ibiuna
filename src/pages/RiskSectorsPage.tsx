@@ -151,7 +151,7 @@ export const RiskSectorsPage: React.FC = () => {
   const handleReturnToMap = () => {
     setIsDetailOpen(false)
     setSearchParams({}, { replace: true })
-    navigate('/', { replace: false })
+    navigate('/painel', { replace: false })
   }
 
   const handleCloseDetailDialog = (open: boolean) => {

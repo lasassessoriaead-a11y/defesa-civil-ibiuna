@@ -148,9 +148,14 @@ export const Layout: React.FC = () => {
             <h1 className="font-bold text-sm tracking-tight text-white leading-tight">
               DEFESA CIVIL
             </h1>
-            <p className="text-[11px] text-blue-400 font-medium truncate max-w-[130px]">
-              {user?.role ? user.role.toUpperCase() : 'MUNICIPAL'}
-            </p>
+            <div className="flex items-center gap-1.5">
+              <p className="text-[11px] text-blue-400 font-medium truncate max-w-[90px]">
+                {user?.role ? user.role.toUpperCase() : 'MUNICIPAL'}
+              </p>
+              <span className="text-[9px] font-mono text-slate-400 bg-slate-800/80 px-1 py-0.2 rounded border border-slate-700">
+                v0.0.32
+              </span>
+            </div>
           </div>
         </div>
 
@@ -331,7 +336,12 @@ export const Layout: React.FC = () => {
             <div className="h-16 flex items-center justify-between px-4 border-b border-slate-800 bg-[#0b1120]">
               <div className="flex items-center gap-2.5">
                 <ShieldAlert className="w-6 h-6 text-blue-500" />
-                <span className="font-bold text-sm">Defesa Civil Municipal</span>
+                <div>
+                  <span className="font-bold text-sm block leading-tight">
+                    Defesa Civil Municipal
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-400">v0.0.32</span>
+                </div>
               </div>
               <Button
                 size="icon"

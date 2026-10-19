@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import {
   AlertTriangle,
@@ -112,8 +112,8 @@ export const Dashboard: React.FC = () => {
   const { user } = useAuth()
   const navigate = useNavigate()
 
-  // Saved Map viewport & layers from session storage
-  const [mapViewport, setMapViewport] = useState<SavedMapState>(() => {
+  // Saved Map viewport & layers from session storage (read once at mount for stable map init)
+  const initialMapViewport = useMemo<SavedMapState>(() => {
     try {
       const raw = sessionStorage.getItem(MAP_STATE_STORAGE_KEY)
       if (raw) {
@@ -133,38 +133,38 @@ export const Dashboard: React.FC = () => {
       center: [-23.655, -47.22],
       zoom: 13,
     }
-  })
+  }, [])
 
-  const handleViewportChange = (newCenter: [number, number], newZoom: number) => {
-    setMapViewport((prev) => {
+  // Viewport and layer changes update sessionStorage directly without triggering
+  // continuous re-renders of the Dashboard component (preventing router lockup)
+  const handleViewportChange = useCallback((newCenter: [number, number], newZoom: number) => {
+    try {
+      const raw = sessionStorage.getItem(MAP_STATE_STORAGE_KEY)
+      const prev = raw ? JSON.parse(raw) : {}
       const updated: SavedMapState = {
         ...prev,
         center: newCenter,
         zoom: newZoom,
       }
-      try {
-        sessionStorage.setItem(MAP_STATE_STORAGE_KEY, JSON.stringify(updated))
-      } catch {
-        /* intentionally ignored */
-      }
-      return updated
-    })
-  }
+      sessionStorage.setItem(MAP_STATE_STORAGE_KEY, JSON.stringify(updated))
+    } catch {
+      /* intentionally ignored */
+    }
+  }, [])
 
-  const handleLayersChange = (layers: any) => {
-    setMapViewport((prev) => {
+  const handleLayersChange = useCallback((layers: any) => {
+    try {
+      const raw = sessionStorage.getItem(MAP_STATE_STORAGE_KEY)
+      const prev = raw ? JSON.parse(raw) : {}
       const updated: SavedMapState = {
         ...prev,
         layers,
       }
-      try {
-        sessionStorage.setItem(MAP_STATE_STORAGE_KEY, JSON.stringify(updated))
-      } catch {
-        /* intentionally ignored */
-      }
-      return updated
-    })
-  }
+      sessionStorage.setItem(MAP_STATE_STORAGE_KEY, JSON.stringify(updated))
+    } catch {
+      /* intentionally ignored */
+    }
+  }, [])
 
   // State collections
   const [occurrences, setOccurrences] = useState<Occurrence[]>([])
@@ -453,9 +453,9 @@ export const Dashboard: React.FC = () => {
         <CardContent className="p-0">
           <InteractiveMap
             height="400px"
-            center={mapViewport.center}
-            zoom={mapViewport.zoom}
-            initialLayers={mapViewport.layers}
+            center={initialMapViewport.center}
+            zoom={initialMapViewport.zoom}
+            initialLayers={initialMapViewport.layers}
             onViewportChange={handleViewportChange}
             onLayersChange={handleLayersChange}
             occurrences={occurrences}
@@ -725,7 +725,7 @@ export const Dashboard: React.FC = () => {
 
           {/* Métrica 4: Pontes Pendentes de Conferência */}
           <Card
-            onClick={() => navigate('/conferencia-pontes')}
+            onClick={() => navigate('/pontes-conferencia')}
             className="border-amber-200 bg-amber-50/30 hover:bg-amber-100/30 transition-colors cursor-pointer"
           >
             <CardContent className="p-4">

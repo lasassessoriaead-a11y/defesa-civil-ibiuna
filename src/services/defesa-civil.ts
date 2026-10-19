@@ -393,6 +393,9 @@ export const auditLogService = {
       requestKey: null,
     })
   },
+  async create(data: Partial<AuditLogEntry>) {
+    return pb.collection('audit_log').create<AuditLogEntry>(data)
+  },
 }
 
 // Shelters
