@@ -153,7 +153,7 @@ export const Layout: React.FC = () => {
                 {user?.role ? user.role.toUpperCase() : 'MUNICIPAL'}
               </p>
               <span className="text-[9px] font-mono text-slate-400 bg-slate-800/80 px-1 py-0.2 rounded border border-slate-700">
-                v0.0.32
+                v0.0.33
               </span>
             </div>
           </div>
@@ -340,7 +340,7 @@ export const Layout: React.FC = () => {
                   <span className="font-bold text-sm block leading-tight">
                     Defesa Civil Municipal
                   </span>
-                  <span className="text-[10px] font-mono text-slate-400">v0.0.32</span>
+                  <span className="text-[10px] font-mono text-slate-400">v0.0.33</span>
                 </div>
               </div>
               <Button

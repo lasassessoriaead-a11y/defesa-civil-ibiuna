@@ -303,8 +303,14 @@ export const StrategicInfrastructuresPage: React.FC = () => {
     if (!selectedInfra) return
     setIsSavingDetailEdit(true)
     try {
-      const newLat = editDetailLat ? parseFloat(editDetailLat) : undefined
-      const newLon = editDetailLon ? parseFloat(editDetailLon) : undefined
+      const newLat =
+        editDetailLat !== '' && !isNaN(parseFloat(editDetailLat))
+          ? parseFloat(editDetailLat)
+          : undefined
+      const newLon =
+        editDetailLon !== '' && !isNaN(parseFloat(editDetailLon))
+          ? parseFloat(editDetailLon)
+          : undefined
 
       const updateData: Partial<StrategicInfrastructure> = {
         neighborhood: editDetailNeighborhood.trim(),
@@ -321,13 +327,18 @@ export const StrategicInfrastructuresPage: React.FC = () => {
 
       const updated = await strategicInfrastructuresService.update(selectedInfra.id, updateData)
 
-      // Registrar auditoria
-      await auditLogService.create({
-        action: 'update',
-        resource: 'strategic_infrastructures',
-        record_id: selectedInfra.id,
-        details: `Edição técnica da infraestrutura ${selectedInfra.original_code}: coordenadas [${selectedInfra.latitude || '—'},${selectedInfra.longitude || '—'}] -> [${newLat || '—'},${newLon || '—'}]`,
-      })
+      // Registrar auditoria de forma segura (não bloqueia salvamento se falhar)
+      try {
+        await auditLogService.create({
+          municipality: selectedInfra.municipality || municipalityId,
+          action: 'update',
+          collection: 'strategic_infrastructures',
+          record_id: selectedInfra.id,
+          details: `Edição técnica da infraestrutura ${selectedInfra.original_code}: condição [${selectedInfra.structural_condition || '—'} -> ${editDetailCondition || '—'}], coordenadas [${selectedInfra.latitude || '—'},${selectedInfra.longitude || '—'}] -> [${newLat || '—'},${newLon || '—'}]`,
+        })
+      } catch (auditErr) {
+        console.warn('Auditoria da infraestrutura ignorada:', auditErr)
+      }
 
       toast({
         title: 'Alterações salvas com sucesso',
@@ -338,10 +349,12 @@ export const StrategicInfrastructuresPage: React.FC = () => {
       setIsEditingInDetail(false)
       loadData()
     } catch (err: any) {
+      // Preserva o formulário em modo de edição (isEditingInDetail permanece true)
+      // e mantém os valores digitados para o usuário não perder suas anotações
       toast({
         variant: 'destructive',
         title: 'Erro ao salvar alterações',
-        description: err.message || 'Sem permissão para editar.',
+        description: err.message || 'Sem permissão para editar esta infraestrutura.',
       })
     } finally {
       setIsSavingDetailEdit(false)

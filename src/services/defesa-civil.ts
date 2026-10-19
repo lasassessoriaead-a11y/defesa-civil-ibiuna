@@ -393,8 +393,38 @@ export const auditLogService = {
       requestKey: null,
     })
   },
-  async create(data: Partial<AuditLogEntry>) {
-    return pb.collection('audit_log').create<AuditLogEntry>(data)
+  async create(data: Partial<AuditLogEntry> & { resource?: string }) {
+    const payload: Record<string, any> = { ...data }
+    // Normalizar resource -> collection para aderência ao schema de audit_log
+    if (payload.resource && !payload.collection) {
+      payload.collection = payload.resource
+      delete payload.resource
+    }
+    // Preencher municipality se omitido a partir do usuário autenticado
+    if (!payload.municipality && pb.authStore.record?.municipality) {
+      payload.municipality = pb.authStore.record.municipality
+    }
+    // Preencher identificação do usuário autenticado se omitida
+    if (!payload.user && pb.authStore.record?.id) {
+      payload.user = pb.authStore.record.id
+    }
+    if (!payload.user_name && (pb.authStore.record?.name || pb.authStore.record?.email)) {
+      payload.user_name = pb.authStore.record.name || pb.authStore.record.email
+    }
+    if (!payload.user_email && pb.authStore.record?.email) {
+      payload.user_email = pb.authStore.record.email
+    }
+    if (!payload.origin) {
+      payload.origin = 'online'
+    }
+
+    try {
+      return await pb.collection('audit_log').create<AuditLogEntry>(payload)
+    } catch (err) {
+      console.warn('[auditLogService.create] Erro ao gravar auditoria:', err)
+      // Não propagar falha de auditoria para não quebrar fluxos operacionais essenciais do usuário
+      return null as any
+    }
   },
 }
 
