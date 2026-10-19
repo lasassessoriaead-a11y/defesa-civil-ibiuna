@@ -5,6 +5,7 @@ import {
   TileLayer as RLTileLayer,
   Marker as RLMarker,
   Popup,
+  Tooltip as RLTooltip,
   Polygon,
   Polyline,
   useMap,
@@ -14,6 +15,7 @@ import {
 const MapContainer = RLMapContainer as React.ComponentType<any>
 const TileLayer = RLTileLayer as React.ComponentType<any>
 const Marker = RLMarker as React.ComponentType<any>
+const Tooltip = RLTooltip as React.ComponentType<any>
 import L from 'leaflet'
 import {
   Layers,
@@ -821,6 +823,10 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               [13, 13],
             )
 
+            const tooltipLabel = `${infra.original_code || infra.code || 'Infraestrutura'}${
+              infra.neighborhood ? ` — ${infra.neighborhood}` : ''
+            }`
+
             return (
               <Marker
                 key={infra.id}
@@ -830,8 +836,11 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                   click: () => onSelectItem?.('infrastructure', infra),
                 }}
               >
+                <Tooltip direction="top" offset={[0, -14]} opacity={0.95}>
+                  <span className="font-semibold text-xs text-slate-900">{tooltipLabel}</span>
+                </Tooltip>
                 <Popup>
-                  <div className="p-1 min-w-[200px] text-xs space-y-1">
+                  <div className="p-1 min-w-[220px] text-xs space-y-1.5">
                     <div className="flex items-center justify-between border-b pb-1 font-bold">
                       <span className="text-slate-900">
                         {infra.original_code} ({infra.structure_type?.toUpperCase() || 'ESTRUTURA'})
@@ -864,6 +873,15 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
                         <strong>Problema:</strong> {infra.problems_reported}
                       </p>
                     )}
+                    <div className="pt-1.5 border-t mt-1">
+                      <button
+                        type="button"
+                        onClick={() => onSelectItem?.('infrastructure', infra)}
+                        className="w-full px-2 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded text-[11px] font-semibold flex items-center justify-center gap-1 transition-colors"
+                      >
+                        Abrir Ficha da Infraestrutura
+                      </button>
+                    </div>
                   </div>
                 </Popup>
               </Marker>
