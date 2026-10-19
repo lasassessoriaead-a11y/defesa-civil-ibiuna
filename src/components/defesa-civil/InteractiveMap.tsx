@@ -156,6 +156,7 @@ interface MapEventsHandlerProps {
   allowDrawingPolygon?: boolean
   polygonPoints?: [number, number][]
   onPolygonChange?: (points: [number, number][]) => void
+  onViewportChange?: (center: [number, number], zoom: number) => void
 }
 
 const MapEventsHandler: React.FC<MapEventsHandlerProps> = ({
@@ -164,6 +165,7 @@ const MapEventsHandler: React.FC<MapEventsHandlerProps> = ({
   allowDrawingPolygon,
   polygonPoints = [],
   onPolygonChange,
+  onViewportChange,
 }) => {
   useMapEvents({
     click(e) {
@@ -177,6 +179,20 @@ const MapEventsHandler: React.FC<MapEventsHandlerProps> = ({
 
       if (interactivePick && onPickCoordinate) {
         onPickCoordinate(lat, lng)
+      }
+    },
+    moveend(e) {
+      if (onViewportChange) {
+        const c = e.target.getCenter()
+        const z = e.target.getZoom()
+        onViewportChange([Number(c.lat.toFixed(6)), Number(c.lng.toFixed(6))], z)
+      }
+    },
+    zoomend(e) {
+      if (onViewportChange) {
+        const c = e.target.getCenter()
+        const z = e.target.getZoom()
+        onViewportChange([Number(c.lat.toFixed(6)), Number(c.lng.toFixed(6))], z)
       }
     },
   })
@@ -258,6 +274,24 @@ const CustomMapControls: React.FC<{
   )
 }
 
+export interface InteractiveMapLayersState {
+  showOccurrences?: boolean
+  showInfrastructures?: boolean
+  showAreas?: boolean
+  showShelters?: boolean
+  showTeams?: boolean
+  showRiskSectorsGeo?: boolean
+  showDangerStretchesGeo?: boolean
+  showInundationGeo?: boolean
+  showHydroGeo?: boolean
+  showMacroGeo?: boolean
+  showContoursGeo?: boolean
+  showUtbGeo?: boolean
+  showPhotosGeo?: boolean
+  showCadEvGeo?: boolean
+  riskFilter?: 'all' | 'R1' | 'R2' | 'R3' | 'R4'
+}
+
 export interface InteractiveMapProps {
   height?: string
   occurrences?: Occurrence[]
@@ -278,6 +312,9 @@ export interface InteractiveMapProps {
   polygonPoints?: [number, number][]
   onPolygonChange?: (points: [number, number][]) => void
   showLayerToggles?: boolean
+  onViewportChange?: (center: [number, number], zoom: number) => void
+  initialLayers?: InteractiveMapLayersState
+  onLayersChange?: (layers: InteractiveMapLayersState) => void
 }
 
 export const InteractiveMap: React.FC<InteractiveMapProps> = ({
@@ -300,23 +337,96 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   polygonPoints = [],
   onPolygonChange,
   showLayerToggles = true,
+  onViewportChange,
+  initialLayers,
+  onLayersChange,
 }) => {
   // Layer toggles
-  const [showOccurrences, setShowOccurrences] = useState(true)
-  const [showInfrastructures, setShowInfrastructures] = useState(true)
-  const [showAreas, setShowAreas] = useState(true)
-  const [showShelters, setShowShelters] = useState(true)
-  const [showTeams, setShowTeams] = useState(true)
-  const [showRiskSectorsGeo, setShowRiskSectorsGeo] = useState(true)
-  const [showDangerStretchesGeo, setShowDangerStretchesGeo] = useState(true)
-  const [showInundationGeo, setShowInundationGeo] = useState(true)
-  const [showHydroGeo, setShowHydroGeo] = useState(true)
-  const [showMacroGeo, setShowMacroGeo] = useState(false)
-  const [showContoursGeo, setShowContoursGeo] = useState(false)
-  const [showUtbGeo, setShowUtbGeo] = useState(false)
-  const [showPhotosGeo, setShowPhotosGeo] = useState(false)
-  const [showCadEvGeo, setShowCadEvGeo] = useState(false)
-  const [riskFilter, setRiskFilter] = useState<'all' | 'R1' | 'R2' | 'R3' | 'R4'>('all')
+  const [showOccurrences, setShowOccurrences] = useState(
+    initialLayers?.showOccurrences !== undefined ? initialLayers.showOccurrences : true,
+  )
+  const [showInfrastructures, setShowInfrastructures] = useState(
+    initialLayers?.showInfrastructures !== undefined ? initialLayers.showInfrastructures : true,
+  )
+  const [showAreas, setShowAreas] = useState(
+    initialLayers?.showAreas !== undefined ? initialLayers.showAreas : true,
+  )
+  const [showShelters, setShowShelters] = useState(
+    initialLayers?.showShelters !== undefined ? initialLayers.showShelters : true,
+  )
+  const [showTeams, setShowTeams] = useState(
+    initialLayers?.showTeams !== undefined ? initialLayers.showTeams : true,
+  )
+  const [showRiskSectorsGeo, setShowRiskSectorsGeo] = useState(
+    initialLayers?.showRiskSectorsGeo !== undefined ? initialLayers.showRiskSectorsGeo : true,
+  )
+  const [showDangerStretchesGeo, setShowDangerStretchesGeo] = useState(
+    initialLayers?.showDangerStretchesGeo !== undefined
+      ? initialLayers.showDangerStretchesGeo
+      : true,
+  )
+  const [showInundationGeo, setShowInundationGeo] = useState(
+    initialLayers?.showInundationGeo !== undefined ? initialLayers.showInundationGeo : true,
+  )
+  const [showHydroGeo, setShowHydroGeo] = useState(
+    initialLayers?.showHydroGeo !== undefined ? initialLayers.showHydroGeo : true,
+  )
+  const [showMacroGeo, setShowMacroGeo] = useState(
+    initialLayers?.showMacroGeo !== undefined ? initialLayers.showMacroGeo : false,
+  )
+  const [showContoursGeo, setShowContoursGeo] = useState(
+    initialLayers?.showContoursGeo !== undefined ? initialLayers.showContoursGeo : false,
+  )
+  const [showUtbGeo, setShowUtbGeo] = useState(
+    initialLayers?.showUtbGeo !== undefined ? initialLayers.showUtbGeo : false,
+  )
+  const [showPhotosGeo, setShowPhotosGeo] = useState(
+    initialLayers?.showPhotosGeo !== undefined ? initialLayers.showPhotosGeo : false,
+  )
+  const [showCadEvGeo, setShowCadEvGeo] = useState(
+    initialLayers?.showCadEvGeo !== undefined ? initialLayers.showCadEvGeo : false,
+  )
+  const [riskFilter, setRiskFilter] = useState<'all' | 'R1' | 'R2' | 'R3' | 'R4'>(
+    initialLayers?.riskFilter || 'all',
+  )
+
+  // Report layer toggles to parent if callback provided
+  useEffect(() => {
+    onLayersChange?.({
+      showOccurrences,
+      showInfrastructures,
+      showAreas,
+      showShelters,
+      showTeams,
+      showRiskSectorsGeo,
+      showDangerStretchesGeo,
+      showInundationGeo,
+      showHydroGeo,
+      showMacroGeo,
+      showContoursGeo,
+      showUtbGeo,
+      showPhotosGeo,
+      showCadEvGeo,
+      riskFilter,
+    })
+  }, [
+    showOccurrences,
+    showInfrastructures,
+    showAreas,
+    showShelters,
+    showTeams,
+    showRiskSectorsGeo,
+    showDangerStretchesGeo,
+    showInundationGeo,
+    showHydroGeo,
+    showMacroGeo,
+    showContoursGeo,
+    showUtbGeo,
+    showPhotosGeo,
+    showCadEvGeo,
+    riskFilter,
+    onLayersChange,
+  ])
 
   // Camadas dinâmicas do banco de dados (geo_layers e geometrias de risk_sectors/danger_stretches)
   const [loadedGeoLayers, setLoadedGeoLayers] = useState<any[]>([])
@@ -401,6 +511,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           allowDrawingPolygon={allowDrawingPolygon}
           polygonPoints={polygonPoints}
           onPolygonChange={onPolygonChange}
+          onViewportChange={onViewportChange}
         />
         <CustomMapControls defaultCenter={validCenter} defaultZoom={zoom} />
 

@@ -98,8 +98,70 @@ const AnimatedCount: React.FC<{ value: number; duration?: number; suffix?: strin
   )
 }
 
+const MAP_STATE_STORAGE_KEY = 'defesa_civil_monitoring_map_state'
+
+interface SavedMapState {
+  center: [number, number]
+  zoom: number
+  layers?: any
+}
+
 export const Dashboard: React.FC = () => {
   const navigate = useNavigate()
+
+  // Saved Map viewport & layers from session storage
+  const [mapViewport, setMapViewport] = useState<SavedMapState>(() => {
+    try {
+      const raw = sessionStorage.getItem(MAP_STATE_STORAGE_KEY)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (
+          Array.isArray(parsed.center) &&
+          parsed.center.length === 2 &&
+          typeof parsed.zoom === 'number'
+        ) {
+          return parsed
+        }
+      }
+    } catch {
+      /* intentionally ignored */
+    }
+    return {
+      center: [-23.655, -47.22],
+      zoom: 13,
+    }
+  })
+
+  const handleViewportChange = (newCenter: [number, number], newZoom: number) => {
+    setMapViewport((prev) => {
+      const updated: SavedMapState = {
+        ...prev,
+        center: newCenter,
+        zoom: newZoom,
+      }
+      try {
+        sessionStorage.setItem(MAP_STATE_STORAGE_KEY, JSON.stringify(updated))
+      } catch {
+        /* intentionally ignored */
+      }
+      return updated
+    })
+  }
+
+  const handleLayersChange = (layers: any) => {
+    setMapViewport((prev) => {
+      const updated: SavedMapState = {
+        ...prev,
+        layers,
+      }
+      try {
+        sessionStorage.setItem(MAP_STATE_STORAGE_KEY, JSON.stringify(updated))
+      } catch {
+        /* intentionally ignored */
+      }
+      return updated
+    })
+  }
 
   // State collections
   const [occurrences, setOccurrences] = useState<Occurrence[]>([])
@@ -387,6 +449,11 @@ export const Dashboard: React.FC = () => {
         <CardContent className="p-0">
           <InteractiveMap
             height="400px"
+            center={mapViewport.center}
+            zoom={mapViewport.zoom}
+            initialLayers={mapViewport.layers}
+            onViewportChange={handleViewportChange}
+            onLayersChange={handleLayersChange}
             occurrences={occurrences}
             shelters={shelters}
             teams={teams}
@@ -399,7 +466,13 @@ export const Dashboard: React.FC = () => {
               if (type === 'shelter') navigate('/abrigos')
               if (type === 'team') navigate('/equipes')
               if (type === 'area') navigate('/areas-afetadas')
-              if (type === 'infrastructure') navigate('/infraestruturas')
+              if (type === 'infrastructure') {
+                // Navega para a ficha da infraestrutura com o id único do registro
+                // Passa fromMap no state para o botão "Voltar ao mapa"
+                navigate(`/infraestruturas?id=${item.id}`, {
+                  state: { fromMap: true },
+                })
+              }
             }}
           />
         </CardContent>
@@ -737,7 +810,11 @@ export const Dashboard: React.FC = () => {
                   .map((infra) => (
                     <div
                       key={infra.id}
-                      onClick={() => navigate('/infraestruturas')}
+                      onClick={() =>
+                        navigate(`/infraestruturas?id=${infra.id}`, {
+                          state: { fromMap: true },
+                        })
+                      }
                       className="p-2.5 bg-orange-50/50 rounded border border-orange-200 hover:bg-orange-100/50 cursor-pointer flex items-center justify-between"
                     >
                       <div>

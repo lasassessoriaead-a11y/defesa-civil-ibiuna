@@ -1,25 +1,21 @@
-import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import {
   Plus,
   Search,
-  Filter,
   MapPin,
-  Calendar,
   AlertTriangle,
-  CheckCircle2,
   AlertOctagon,
   FileText,
   Camera,
   ExternalLink,
-  ChevronRight,
-  Shield,
-  Clock,
   ClipboardList,
-  Edit,
-  Trash2,
   Building2,
   Eye,
+  Map as MapIcon,
+  XCircle,
+  FileQuestion,
+  Layers,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -49,17 +45,21 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { Textarea } from '@/components/ui/textarea'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import pb from '@/lib/pocketbase/client'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/hooks/use-toast'
 import {
   strategicInfrastructuresService,
   bridgeInspectionsService,
   occurrencesService,
+  externalDemandsService,
 } from '@/services/defesa-civil'
 import type {
   StrategicInfrastructure,
   BridgeInspection,
   Occurrence,
+  ExternalDemand,
   InfrastructureType,
 } from '@/types/defesa-civil'
 
@@ -67,6 +67,9 @@ export const StrategicInfrastructuresPage: React.FC = () => {
   const { user } = useAuth()
   const { toast } = useToast()
   const navigate = useNavigate()
+  const location = useLocation()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlParamId = searchParams.get('id')
 
   const [infrastructures, setInfrastructures] = useState<StrategicInfrastructure[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -78,9 +81,13 @@ export const StrategicInfrastructuresPage: React.FC = () => {
   // Modal de Detalhes & Inspeção
   const [selectedInfra, setSelectedInfra] = useState<StrategicInfrastructure | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [detailNotFound, setDetailNotFound] = useState(false)
   const [inspections, setInspections] = useState<BridgeInspection[]>([])
   const [relatedOccurrences, setRelatedOccurrences] = useState<Occurrence[]>([])
+  const [relatedDemands, setRelatedDemands] = useState<ExternalDemand[]>([])
   const [isLoadingDetails, setIsLoadingDetails] = useState(false)
+  const [openedFromMap, setOpenedFromMap] = useState<boolean>(false)
+  const hasInitializedRef = useRef(false)
 
   // Modal de Nova Inspeção Técnica
   const [isNewInspectionOpen, setIsNewInspectionOpen] = useState(false)
@@ -114,36 +121,109 @@ export const StrategicInfrastructuresPage: React.FC = () => {
   const loadData = async () => {
     setIsLoading(true)
     try {
-      const records = await strategicInfrastructuresService.list(undefined, 'original_code')
+      // Isolamento por município nas consultas da listagem
+      const filter = municipalityId ? `municipality = "${municipalityId}"` : undefined
+      const records = await strategicInfrastructuresService.list(filter, 'original_code')
       setInfrastructures(records)
+      return records
     } catch (e) {
       console.error(e)
+      return []
     } finally {
       setIsLoading(false)
     }
   }
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  const openDetails = useCallback(
+    async (infra: StrategicInfrastructure, fromMapSource = false) => {
+      setSelectedInfra(infra)
+      setDetailNotFound(false)
+      setIsDetailOpen(true)
+      setIsLoadingDetails(true)
+      setOpenedFromMap(fromMapSource)
 
-  const openDetails = async (infra: StrategicInfrastructure) => {
-    setSelectedInfra(infra)
-    setIsDetailOpen(true)
-    setIsLoadingDetails(true)
-    try {
-      const [insps, occs] = await Promise.all([
-        bridgeInspectionsService.listForInfrastructure(infra.id),
-        occurrencesService.list(`strategic_infrastructure = "${infra.id}"`),
-      ])
-      setInspections(insps)
-      setRelatedOccurrences(occs)
-    } catch (err) {
-      console.error(err)
-    } finally {
-      setIsLoadingDetails(false)
+      try {
+        const munFilter = municipalityId ? ` && municipality = "${municipalityId}"` : ''
+        const [insps, occs, dems] = await Promise.all([
+          bridgeInspectionsService.listForInfrastructure(infra.id),
+          occurrencesService.list(`strategic_infrastructure = "${infra.id}"${munFilter}`),
+          externalDemandsService.list(
+            `related_infrastructure = "${infra.id}"${munFilter}`,
+            '-created',
+          ),
+        ])
+        setInspections(insps)
+        setRelatedOccurrences(occs)
+        setRelatedDemands(dems)
+      } catch (err) {
+        console.error(err)
+      } finally {
+        setIsLoadingDetails(false)
+      }
+    },
+    [municipalityId],
+  )
+
+  const handleReturnToMap = () => {
+    setIsDetailOpen(false)
+    // Limpa a query string
+    setSearchParams({}, { replace: true })
+    // Retorna para o mapa no dashboard; InteractiveMap restaura automaticamente centro, zoom e camadas
+    navigate('/', { replace: false })
+  }
+
+  const handleCloseDetailDialog = (open: boolean) => {
+    setIsDetailOpen(open)
+    if (!open) {
+      // Remove o parâmetro ?id da URL sem recarregar a tela
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.delete('id')
+      setSearchParams(nextParams, { replace: true })
+      setDetailNotFound(false)
     }
   }
+
+  // Carrega e observa o parâmetro ?id=... da URL
+  useEffect(() => {
+    const init = async () => {
+      const records = await loadData()
+
+      if (urlParamId) {
+        // Checa se veio do mapa via router state
+        const isFromMap = Boolean((location.state as any)?.fromMap)
+        // Busca na lista local primeiro ou consulta no backend com isolamento de município
+        let target = records.find((r) => r.id === urlParamId)
+        if (!target) {
+          try {
+            const fetched = await strategicInfrastructuresService.get(urlParamId)
+            if (
+              fetched &&
+              (!municipalityId || !fetched.municipality || fetched.municipality === municipalityId)
+            ) {
+              target = fetched
+            }
+          } catch (_) {
+            target = undefined
+          }
+        }
+
+        if (target) {
+          openDetails(target, isFromMap)
+        } else {
+          // Id inválido ou não pertencente ao município do usuário: exibe mensagem clara
+          setSelectedInfra(null)
+          setDetailNotFound(true)
+          setIsDetailOpen(true)
+          setOpenedFromMap(isFromMap)
+        }
+      }
+    }
+
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true
+      init()
+    }
+  }, [urlParamId, municipalityId, location.state, openDetails])
 
   const handleCreateInspection = async () => {
     if (!selectedInfra) return
@@ -533,172 +613,570 @@ export const StrategicInfrastructuresPage: React.FC = () => {
         </CardContent>
       </Card>
 
-      {/* Modal de Detalhes Técnicos, Vistorias e Ocorrências Vinculadas */}
-      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          {selectedInfra && (
+      {/* Modal de Detalhes Técnicos, Vistorias, Fotos e Documentos */}
+      <Dialog open={isDetailOpen} onOpenChange={handleCloseDetailDialog}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {detailNotFound ? (
+            <div className="py-8 text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 mx-auto flex items-center justify-center">
+                <XCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-slate-900">
+                  Infraestrutura Não Encontrada
+                </h3>
+                <p className="text-xs text-slate-500 max-w-sm mx-auto mt-1">
+                  O identificador de infraestrutura informado não foi localizado no cadastro deste
+                  município ou pode ter sido removido.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={() => handleCloseDetailDialog(false)}>
+                  Ver Todas as Infraestruturas
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleReturnToMap}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <MapIcon className="w-3.5 h-3.5 mr-1.5" />
+                  Voltar ao mapa
+                </Button>
+              </div>
+            </div>
+          ) : selectedInfra ? (
             <>
               <DialogHeader>
-                <div className="flex items-center justify-between">
-                  <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                    <Building2 className="w-5 h-5 text-blue-600" />
-                    Estrutura {selectedInfra.original_code} —{' '}
-                    {selectedInfra.neighborhood || 'Local não informado'}
-                  </DialogTitle>
-                  <Badge variant="outline" className="capitalize">
-                    {selectedInfra.type.replace('_', ' ')}
-                  </Badge>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-2 bg-blue-100 text-blue-700 rounded-lg">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <DialogTitle className="text-lg font-bold text-slate-900 flex items-center gap-2">
+                        Ficha Técnica: {selectedInfra.original_code}
+                        <Badge
+                          variant="outline"
+                          className={
+                            selectedInfra.type === 'ponte'
+                              ? 'bg-blue-50 text-blue-700 border-blue-200 capitalize text-[11px]'
+                              : selectedInfra.type === 'aduela'
+                                ? 'bg-indigo-50 text-indigo-700 border-indigo-200 capitalize text-[11px]'
+                                : 'bg-slate-100 text-slate-700 border-slate-200 capitalize text-[11px]'
+                          }
+                        >
+                          {selectedInfra.type
+                            ? selectedInfra.type.replace('_', ' ')
+                            : 'Não avaliado'}
+                        </Badge>
+                      </DialogTitle>
+                      <DialogDescription className="text-xs text-slate-500 mt-0.5">
+                        {selectedInfra.neighborhood || 'Bairro não informado'}
+                        {selectedInfra.reference_point ? ` • ${selectedInfra.reference_point}` : ''}
+                      </DialogDescription>
+                    </div>
+                  </div>
+
+                  {/* Botão de retorno direto preservando estado do mapa */}
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleReturnToMap}
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0 shadow-sm"
+                  >
+                    <MapIcon className="w-3.5 h-3.5 mr-1.5" />
+                    Voltar ao mapa
+                  </Button>
                 </div>
-                <DialogDescription className="text-xs">
-                  Prancha documental: {selectedInfra.source_document || 'Pontes e aduelas.pdf'}{' '}
-                  (Página {selectedInfra.source_page || '-'})
-                </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-4 py-2 text-xs">
-                {/* Atributos Gerais */}
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-3 p-3 bg-slate-50 rounded-lg border">
-                  <div>
-                    <span className="text-slate-500 block">Ponto de Referência:</span>
-                    <strong className="text-slate-800">
-                      {selectedInfra.reference_point || 'Não informado'}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block">Dimensões / Calha:</span>
-                    <strong className="text-slate-800">
-                      {selectedInfra.dimensions || selectedInfra.channel_width || 'Não informado'}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block">Coordenadas DMS:</span>
-                    <span className="font-mono text-slate-700">
-                      {selectedInfra.lat_dms || '-'} / {selectedInfra.lon_dms || '-'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block">Condição Estrutural:</span>
-                    <strong className="capitalize text-slate-800">
-                      {selectedInfra.structural_condition?.replace('_', ' ') || 'Não avaliado'}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block">Prioridade Operacional:</span>
-                    <strong className="capitalize text-slate-800">
-                      {selectedInfra.administrative_priority || 'Média'}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-slate-500 block">Status no Mapa:</span>
-                    <strong
-                      className={selectedInfra.latitude ? 'text-emerald-700' : 'text-amber-600'}
-                    >
-                      {selectedInfra.latitude ? 'Georreferenciada' : 'Aguardando validação'}
-                    </strong>
-                  </div>
+              {/* Informações Básicas em Destaque */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 p-3 bg-slate-50 rounded-lg border border-slate-200 text-xs">
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Código Identificador:</span>
+                  <strong className="font-mono text-slate-900 text-sm">
+                    {selectedInfra.original_code}
+                  </strong>
                 </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Tipo de Estrutura:</span>
+                  <strong className="capitalize text-slate-800">
+                    {selectedInfra.type ? selectedInfra.type.replace('_', ' ') : 'Não avaliado'}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Bairro / Localidade:</span>
+                  <strong className="text-slate-800">
+                    {selectedInfra.neighborhood || 'Não informado'}
+                  </strong>
+                </div>
+                <div>
+                  <span className="text-slate-500 block text-[11px]">Condição Estrutural:</span>
+                  <Badge
+                    variant="outline"
+                    className={
+                      selectedInfra.structural_condition === 'critico'
+                        ? 'bg-red-100 text-red-800 border-red-300'
+                        : selectedInfra.structural_condition === 'ruim'
+                          ? 'bg-orange-100 text-orange-800 border-orange-300'
+                          : selectedInfra.structural_condition === 'regular'
+                            ? 'bg-amber-100 text-amber-800 border-amber-300'
+                            : selectedInfra.structural_condition === 'bom'
+                              ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                              : 'bg-slate-100 text-slate-600'
+                    }
+                  >
+                    {selectedInfra.structural_condition
+                      ? selectedInfra.structural_condition.replace('_', ' ')
+                      : 'Não avaliado'}
+                  </Badge>
+                </div>
+              </div>
 
-                {/* Problemas Observados */}
-                {selectedInfra.observed_problems && (
-                  <div className="p-3 bg-amber-50 rounded-lg border border-amber-200">
-                    <p className="font-bold text-amber-900 mb-0.5">
-                      Problemas Registrados em Campo:
-                    </p>
-                    <p className="text-amber-800">{selectedInfra.observed_problems}</p>
+              {/* Abas da Ficha: Dados Gerais, Vistorias, Fotos & Documentos, Demandas & Ocorrências */}
+              <Tabs defaultValue="dados" className="w-full">
+                <TabsList className="grid w-full grid-cols-4 h-9">
+                  <TabsTrigger value="dados" className="text-xs">
+                    <FileText className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
+                    Dados Gerais
+                  </TabsTrigger>
+                  <TabsTrigger value="vistorias" className="text-xs">
+                    <ClipboardList className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
+                    Vistorias ({inspections.length})
+                  </TabsTrigger>
+                  <TabsTrigger value="fotos-docs" className="text-xs">
+                    <Camera className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
+                    Fotos & Docs
+                  </TabsTrigger>
+                  <TabsTrigger value="ocorrencias" className="text-xs">
+                    <AlertOctagon className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
+                    Ocorrências ({relatedOccurrences.length})
+                  </TabsTrigger>
+                </TabsList>
+
+                {/* Aba 1: Dados Gerais */}
+                <TabsContent value="dados" className="space-y-3 pt-2 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {/* Bloco de Coordenadas e Posição */}
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-2">
+                      <h4 className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                        <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                        Coordenadas Geográficas
+                      </h4>
+                      <div className="space-y-1.5">
+                        <div>
+                          <span className="text-slate-500 block text-[11px]">
+                            Coordenadas DMS (Original Preservado):
+                          </span>
+                          <span className="font-mono text-slate-800 font-semibold bg-slate-50 px-2 py-0.5 rounded inline-block">
+                            {selectedInfra.lat_dms || '—'} / {selectedInfra.lon_dms || '—'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block text-[11px]">
+                            Coordenadas Decimais (WGS84):
+                          </span>
+                          {selectedInfra.latitude && selectedInfra.longitude ? (
+                            <span className="font-mono text-emerald-700 font-semibold">
+                              {selectedInfra.latitude.toFixed(6)},{' '}
+                              {selectedInfra.longitude.toFixed(6)}
+                            </span>
+                          ) : (
+                            <span className="text-amber-600 italic">
+                              Aguardando conferência / Ausente no mapa
+                            </span>
+                          )}
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block text-[11px]">
+                            Status da Coordenada:
+                          </span>
+                          <Badge
+                            variant="outline"
+                            className={
+                              selectedInfra.coordinate_status === 'valida'
+                                ? 'bg-emerald-50 text-emerald-700 border-emerald-200 capitalize'
+                                : selectedInfra.coordinate_status === 'duvidosa'
+                                  ? 'bg-amber-50 text-amber-700 border-amber-200 capitalize'
+                                  : 'bg-slate-100 text-slate-700 border-slate-200 capitalize'
+                            }
+                          >
+                            {selectedInfra.coordinate_status || 'não informado'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Bloco de Dimensões e Referências */}
+                    <div className="p-3 bg-white rounded-lg border border-slate-200 space-y-2">
+                      <h4 className="font-bold text-slate-800 flex items-center gap-1.5 text-xs">
+                        <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                        Dimensões & Prancha Documental
+                      </h4>
+                      <div className="space-y-1.5">
+                        <div>
+                          <span className="text-slate-500 block text-[11px]">
+                            Dimensões / Calha / Vão Livre:
+                          </span>
+                          <span className="font-semibold text-slate-800">
+                            {selectedInfra.dimensions ||
+                              selectedInfra.channel_width ||
+                              'Não informado'}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block text-[11px]">
+                            Documento Fonte / Prancha:
+                          </span>
+                          <span className="text-slate-700 font-medium">
+                            {selectedInfra.source_document || 'Pontes e aduelas.pdf'} (Página{' '}
+                            {selectedInfra.source_page || '-'})
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-500 block text-[11px]">
+                            Prioridade Operacional:
+                          </span>
+                          <span className="font-semibold capitalize text-slate-800">
+                            {selectedInfra.administrative_priority || 'Média'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                )}
 
-                {/* Histórico de Vistorias Técnicas */}
-                <div className="space-y-2">
+                  {/* Problemas Registrados em Campo */}
+                  {selectedInfra.observed_problems && (
+                    <div className="p-3 bg-amber-50/80 rounded-lg border border-amber-200">
+                      <p className="font-bold text-amber-900 mb-1 flex items-center gap-1.5">
+                        <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
+                        Problemas Registrados no Levantamento de Campo:
+                      </p>
+                      <p className="text-amber-800 text-xs leading-relaxed">
+                        {selectedInfra.observed_problems}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Notas Técnicas / Observações */}
+                  {selectedInfra.notes && (
+                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
+                      <p className="font-bold text-slate-800 mb-1">Observações Complementares:</p>
+                      <p className="text-slate-600 text-xs">{selectedInfra.notes}</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Aba 2: Vistorias Técnicas */}
+                <TabsContent value="vistorias" className="space-y-3 pt-2 text-xs">
                   <div className="flex items-center justify-between">
-                    <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
-                      <ClipboardList className="w-4 h-4 text-indigo-600" />
-                      Histórico de Vistorias e Inspeções Técnicas ({inspections.length})
-                    </h4>
+                    <div>
+                      <h4 className="font-bold text-slate-800">
+                        Histórico de Vistorias Técnicas ({inspections.length})
+                      </h4>
+                      <p className="text-[11px] text-slate-500">
+                        Inspeções estruturais realizadas pela equipe técnica da Defesa Civil
+                      </p>
+                    </div>
                     <Button
                       size="sm"
                       onClick={() => setIsNewInspectionOpen(true)}
                       className="h-7 text-xs bg-indigo-600 hover:bg-indigo-700 text-white"
                     >
                       <Plus className="w-3.5 h-3.5 mr-1" />
-                      Registrar Nova Vistoria
+                      Nova Vistoria
                     </Button>
                   </div>
 
-                  {inspections.length === 0 ? (
-                    <p className="text-slate-500 italic p-3 bg-slate-50 rounded border text-center">
-                      Nenhuma vistoria técnica registrada para esta estrutura.
-                    </p>
+                  {isLoadingDetails ? (
+                    <p className="text-slate-500 italic p-4 text-center">Carregando vistorias...</p>
+                  ) : inspections.length === 0 ? (
+                    <div className="p-6 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-center space-y-2">
+                      <FileQuestion className="w-8 h-8 text-slate-400 mx-auto" />
+                      <p className="text-slate-600 font-medium">
+                        Nenhuma vistoria técnica registrada para esta estrutura.
+                      </p>
+                      <p className="text-slate-400 text-[11px]">
+                        Clique em "Nova Vistoria" para arquivar a avaliação estrutural de campo.
+                      </p>
+                    </div>
                   ) : (
-                    <div className="space-y-2">
+                    <div className="space-y-2.5">
                       {inspections.map((insp) => (
                         <div
                           key={insp.id}
-                          className="p-3 bg-white border rounded-lg shadow-sm space-y-1"
+                          className="p-3 bg-white border border-slate-200 rounded-lg shadow-sm space-y-2"
                         >
                           <div className="flex items-center justify-between">
                             <span className="font-semibold text-slate-800">
-                              Data: {new Date(insp.inspection_date).toLocaleDateString('pt-BR')}
+                              Data:{' '}
+                              {insp.inspection_date
+                                ? new Date(insp.inspection_date).toLocaleDateString('pt-BR')
+                                : '-'}
                             </span>
-                            <Badge variant="outline" className="capitalize">
-                              Condição: {insp.structural_condition}
-                            </Badge>
+                            <div className="flex items-center gap-1.5">
+                              <Badge
+                                variant="outline"
+                                className={
+                                  insp.structural_condition === 'critico'
+                                    ? 'bg-red-50 text-red-700 border-red-200 capitalize'
+                                    : insp.structural_condition === 'ruim'
+                                      ? 'bg-orange-50 text-orange-700 border-orange-200 capitalize'
+                                      : insp.structural_condition === 'regular'
+                                        ? 'bg-amber-50 text-amber-700 border-amber-200 capitalize'
+                                        : 'bg-emerald-50 text-emerald-700 border-emerald-200 capitalize'
+                                }
+                              >
+                                Condição: {insp.structural_condition}
+                              </Badge>
+                              {insp.traffic_condition && (
+                                <Badge variant="outline" className="capitalize">
+                                  Trânsito: {insp.traffic_condition.replace('_', ' ')}
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                           {insp.problems_found && (
-                            <p className="text-slate-600">
-                              <strong>Problemas:</strong> {insp.problems_found}
+                            <p className="text-slate-700">
+                              <strong className="text-slate-900">Problemas:</strong>{' '}
+                              {insp.problems_found}
                             </p>
                           )}
                           {insp.technical_recommendations && (
-                            <p className="text-slate-600">
-                              <strong>Recomendações:</strong> {insp.technical_recommendations}
+                            <p className="text-slate-700">
+                              <strong className="text-slate-900">Recomendações:</strong>{' '}
+                              {insp.technical_recommendations}
                             </p>
+                          )}
+                          {insp.photo && (
+                            <div className="pt-1">
+                              <a
+                                href={
+                                  Array.isArray(insp.photo)
+                                    ? pb.files.getURL(insp, insp.photo[0])
+                                    : pb.files.getURL(insp, insp.photo as unknown as string)
+                                }
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                              >
+                                <Camera className="w-3.5 h-3.5" />
+                                Ver Foto da Vistoria
+                              </a>
+                            </div>
                           )}
                         </div>
                       ))}
                     </div>
                   )}
-                </div>
+                </TabsContent>
 
-                {/* Ocorrências Vinculadas */}
-                <div className="space-y-2 pt-2 border-t">
-                  <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
-                    <AlertOctagon className="w-4 h-4 text-red-600" />
-                    Ocorrências Municipais Relacionadas ({relatedOccurrences.length})
-                  </h4>
+                {/* Aba 3: Fotos e Documentos */}
+                <TabsContent value="fotos-docs" className="space-y-3 pt-2 text-xs">
+                  <div>
+                    <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <Camera className="w-4 h-4 text-blue-600" />
+                      Documentos & Acervo Fotográfico
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Fotografias registradas em vistorias técnicas, relatórios e prancha original
+                      do levantamento
+                    </p>
+                  </div>
+
+                  {/* Documento Original de Referência */}
+                  <div className="p-3 bg-indigo-50/60 rounded-lg border border-indigo-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <p className="font-bold text-indigo-950 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-indigo-700" />
+                        Prancha Cadastral Oficial:{' '}
+                        {selectedInfra.source_document || 'Pontes e aduelas.pdf'}
+                      </p>
+                      <p className="text-indigo-800 text-[11px]">
+                        Página {selectedInfra.source_page || '-'} do levantamento original de campo.
+                      </p>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => navigate('/pontes-conferencia')}
+                      className="border-indigo-300 text-indigo-700 hover:bg-indigo-100 text-xs shrink-0"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                      Abrir na Conferência Assistida
+                    </Button>
+                  </div>
+
+                  {/* Galeria de Fotos das Vistorias e Demandas */}
+                  {inspections.some((i) => Boolean(i.photo)) ||
+                  relatedDemands.some((d) => Boolean(d.photos)) ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {inspections
+                        .filter((i) => Boolean(i.photo))
+                        .map((insp) => {
+                          const photoFilename = Array.isArray(insp.photo)
+                            ? insp.photo[0]
+                            : (insp.photo as unknown as string)
+                          if (!photoFilename) return null
+                          const photoUrl = pb.files.getURL(insp, photoFilename)
+                          return (
+                            <div
+                              key={insp.id}
+                              className="border rounded-lg overflow-hidden bg-white shadow-sm"
+                            >
+                              <img
+                                src={photoUrl}
+                                alt="Foto da Vistoria"
+                                className="w-full h-36 object-cover hover:scale-105 transition-transform cursor-pointer"
+                                onClick={() => window.open(photoUrl, '_blank')}
+                              />
+                              <div className="p-2 text-[11px] text-slate-600">
+                                <p className="font-semibold text-slate-800">Vistoria Técnica</p>
+                                <p>
+                                  {insp.inspection_date
+                                    ? new Date(insp.inspection_date).toLocaleDateString('pt-BR')
+                                    : ''}
+                                </p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      {relatedDemands
+                        .filter((d) => Boolean(d.photos))
+                        .map((dem) => {
+                          const photoFilename = Array.isArray(dem.photos)
+                            ? dem.photos[0]
+                            : (dem.photos as unknown as string)
+                          if (!photoFilename) return null
+                          const photoUrl = pb.files.getURL(dem, photoFilename)
+                          return (
+                            <div
+                              key={dem.id}
+                              className="border rounded-lg overflow-hidden bg-white shadow-sm"
+                            >
+                              <img
+                                src={photoUrl}
+                                alt="Foto da Demanda"
+                                className="w-full h-36 object-cover hover:scale-105 transition-transform cursor-pointer"
+                                onClick={() => window.open(photoUrl, '_blank')}
+                              />
+                              <div className="p-2 text-[11px] text-slate-600">
+                                <p className="font-semibold text-slate-800">Demanda Externa</p>
+                                <p className="truncate">{dem.title}</p>
+                              </div>
+                            </div>
+                          )
+                        })}
+                    </div>
+                  ) : (
+                    <div className="p-6 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-center space-y-2">
+                      <Camera className="w-8 h-8 text-slate-400 mx-auto" />
+                      <p className="text-slate-600 font-medium">
+                        Nenhuma fotografia anexada diretamente nas vistorias desta estrutura.
+                      </p>
+                      <p className="text-slate-400 text-[11px]">
+                        Ao cadastrar novas vistorias técnicas, você pode anexar fotos das
+                        cabeceiras, vigas e calha.
+                      </p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* Aba 4: Ocorrências e Demandas Vinculadas */}
+                <TabsContent value="ocorrencias" className="space-y-3 pt-2 text-xs">
+                  <div>
+                    <h4 className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <AlertOctagon className="w-4 h-4 text-red-600" />
+                      Ocorrências Municipais Relacionadas ({relatedOccurrences.length})
+                    </h4>
+                    <p className="text-[11px] text-slate-500">
+                      Ocorrências abertas pela população ou agentes vinculadas a esta infraestrutura
+                    </p>
+                  </div>
 
                   {relatedOccurrences.length === 0 ? (
-                    <p className="text-slate-500 italic p-3 bg-slate-50 rounded border text-center">
-                      Nenhuma ocorrência municipal registrada neste ponto ou vinculada a esta
-                      estrutura.
-                    </p>
+                    <div className="p-6 bg-slate-50 rounded-lg border border-dashed border-slate-300 text-center space-y-1">
+                      <p className="text-slate-600 font-medium">
+                        Nenhuma ocorrência registrada neste ponto ou vinculada a esta estrutura.
+                      </p>
+                      <p className="text-slate-400 text-[11px]">
+                        Estrutura opera sem chamados emergenciais em aberto.
+                      </p>
+                    </div>
                   ) : (
-                    <div className="space-y-1.5">
+                    <div className="space-y-2">
                       {relatedOccurrences.map((occ) => (
                         <div
                           key={occ.id}
-                          className="p-2.5 bg-slate-50 rounded border flex items-center justify-between"
+                          className="p-3 bg-white rounded-lg border border-slate-200 flex items-center justify-between gap-3 hover:bg-slate-50 cursor-pointer"
+                          onClick={() => navigate(`/ocorrencias?id=${occ.id}`)}
                         >
                           <div>
-                            <span className="font-semibold text-slate-900">{occ.title}</span>
-                            <span className="text-slate-500 ml-2">({occ.code})</span>
+                            <div className="flex items-center gap-2">
+                              <span className="font-bold text-slate-900">{occ.title}</span>
+                              <span className="text-slate-500 font-mono text-[11px]">
+                                ({occ.code})
+                              </span>
+                            </div>
                             <p className="text-slate-600 text-[11px] mt-0.5">{occ.address}</p>
                           </div>
-                          <Badge variant="outline">{occ.severity}</Badge>
+                          <Badge
+                            variant="outline"
+                            className={
+                              occ.severity === 'critica'
+                                ? 'bg-red-50 text-red-700 border-red-200'
+                                : 'bg-slate-100 text-slate-700'
+                            }
+                          >
+                            {occ.severity}
+                          </Badge>
                         </div>
                       ))}
                     </div>
                   )}
-                </div>
-              </div>
 
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
+                  {/* Demandas para outras secretarias */}
+                  {relatedDemands.length > 0 && (
+                    <div className="pt-2 border-t space-y-2">
+                      <h5 className="font-bold text-slate-800">
+                        Demandas para Outras Secretarias ({relatedDemands.length})
+                      </h5>
+                      {relatedDemands.map((dem) => (
+                        <div
+                          key={dem.id}
+                          className="p-2.5 bg-slate-50 rounded border flex items-center justify-between"
+                        >
+                          <div>
+                            <span className="font-semibold text-slate-800">{dem.title}</span>
+                            <span className="text-slate-500 ml-2">
+                              (Para: {dem.target_department})
+                            </span>
+                          </div>
+                          <Badge variant="outline" className="capitalize">
+                            {dem.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+
+              <DialogFooter className="flex flex-row items-center justify-between pt-2 border-t">
+                <Button
+                  variant="default"
+                  onClick={handleReturnToMap}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold"
+                >
+                  <MapIcon className="w-3.5 h-3.5 mr-1.5" />
+                  Voltar ao mapa
+                </Button>
+                <Button variant="outline" onClick={() => handleCloseDetailDialog(false)}>
                   Fechar
                 </Button>
               </DialogFooter>
             </>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
 
