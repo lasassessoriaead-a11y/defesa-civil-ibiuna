@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   MapContainer as RLMapContainer,
   TileLayer as RLTileLayer,
@@ -28,6 +29,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import pb from '@/lib/pocketbase/client'
 import type {
   Occurrence,
   Shelter,
@@ -439,18 +441,19 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [localityFilter, setLocalityFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<'all' | 'setor' | 'trecho'>('all')
 
+  const navigate = useNavigate()
+
   // Carregamento resiliente das geometrias vinculadas do banco
   useEffect(() => {
     let isMounted = true
     async function fetchGeometries() {
       try {
-        const { pb: pbClient } = await import('@/lib/pocketbase/client')
         const [layersRes, sectorsRes, stretchesRes] = await Promise.all([
-          pbClient
+          pb
             ?.collection('geo_layers')
             ?.getFullList({ batch: 1000, requestKey: null })
             .catch(() => []) || [],
-          pbClient
+          pb
             ?.collection('risk_sectors')
             ?.getFullList({
               filter: 'geometry_geojson != ""',
@@ -458,7 +461,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               requestKey: null,
             })
             .catch(() => []) || [],
-          pbClient
+          pb
             ?.collection('danger_stretches')
             ?.getFullList({
               filter: 'geometry_geojson != ""',

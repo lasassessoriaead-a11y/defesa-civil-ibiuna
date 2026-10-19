@@ -18,7 +18,9 @@ import {
   Flame,
   FileSpreadsheet,
   ShieldAlert,
+  Navigation,
 } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -107,6 +109,7 @@ interface SavedMapState {
 }
 
 export const Dashboard: React.FC = () => {
+  const { user } = useAuth()
   const navigate = useNavigate()
 
   // Saved Map viewport & layers from session storage
@@ -203,8 +206,8 @@ export const Dashboard: React.FC = () => {
         affectedAreasService.list(munFilter),
         riskSectorsService.list(munFilter, 'code', 600),
         dangerStretchesService.list(munFilter, 'code', 600),
-        strategicInfrastructuresService.list(munFilter, 'original_code', 600),
-        externalDemandsService.list(munFilter, '-created', 600),
+        strategicInfrastructuresService.list(munFilter, 'original_code'),
+        externalDemandsService.list(munFilter, '-created'),
       ])
       setOccurrences(occData)
       setShelters(shelterData)
