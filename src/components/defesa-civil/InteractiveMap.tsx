@@ -290,6 +290,8 @@ export interface InteractiveMapLayersState {
   showPhotosGeo?: boolean
   showCadEvGeo?: boolean
   riskFilter?: 'all' | 'R1' | 'R2' | 'R3' | 'R4'
+  localityFilter?: string
+  typeFilter?: 'all' | 'setor' | 'trecho'
 }
 
 export interface InteractiveMapProps {
@@ -428,30 +430,42 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     onLayersChange,
   ])
 
-  // Camadas dinâmicas do banco de dados (geo_layers e geometrias de risk_sectors/danger_stretches)
+  // Camadas dinâmicas do banco de dados (geo_layers e geometrias vinculadas de risk_sectors/danger_stretches)
   const [loadedGeoLayers, setLoadedGeoLayers] = useState<any[]>([])
   const [geoRiskSectors, setGeoRiskSectors] = useState<any[]>([])
   const [geoDangerStretches, setGeoDangerStretches] = useState<any[]>([])
   const [currentZoom, setCurrentZoom] = useState(zoom)
+  const [mapCenter, setMapCenter] = useState<[number, number]>(center)
+  const [localityFilter, setLocalityFilter] = useState<string>('all')
+  const [typeFilter, setTypeFilter] = useState<'all' | 'setor' | 'trecho'>('all')
 
+  // Carregamento resiliente das geometrias vinculadas do banco
   useEffect(() => {
     let isMounted = true
     async function fetchGeometries() {
       try {
+        const { pb: pbClient } = await import('@/lib/pocketbase/client')
         const [layersRes, sectorsRes, stretchesRes] = await Promise.all([
-          (window as any).pb
+          pbClient
             ?.collection('geo_layers')
-            ?.getFullList({ batch: 1000, requestKey: null }) || Promise.resolve([]),
-          (window as any).pb?.collection('risk_sectors')?.getFullList({
-            filter: 'geometry_geojson != ""',
-            batch: 500,
-            requestKey: null,
-          }) || Promise.resolve([]),
-          (window as any).pb?.collection('danger_stretches')?.getFullList({
-            filter: 'geometry_geojson != ""',
-            batch: 500,
-            requestKey: null,
-          }) || Promise.resolve([]),
+            ?.getFullList({ batch: 1000, requestKey: null })
+            .catch(() => []) || [],
+          pbClient
+            ?.collection('risk_sectors')
+            ?.getFullList({
+              filter: 'geometry_geojson != ""',
+              batch: 500,
+              requestKey: null,
+            })
+            .catch(() => []) || [],
+          pbClient
+            ?.collection('danger_stretches')
+            ?.getFullList({
+              filter: 'geometry_geojson != ""',
+              batch: 500,
+              requestKey: null,
+            })
+            .catch(() => []) || [],
         ])
 
         if (isMounted) {
@@ -468,6 +482,47 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       isMounted = false
     }
   }, [])
+
+  // Coleta todas as localidades únicas disponíveis nas feições e registros
+  const availableLocalities = useMemo(() => {
+    const locSet = new Set<string>()
+    geoRiskSectors.forEach((s) => {
+      const loc = s.location || s.area_name
+      if (loc && typeof loc === 'string') locSet.add(loc.trim())
+    })
+    geoDangerStretches.forEach((t) => {
+      const loc = t.location || t.area_name
+      if (loc && typeof loc === 'string') locSet.add(loc.trim())
+    })
+    loadedGeoLayers.forEach((l) => {
+      const loc = l.locality || l.location || l.name
+      if (loc && typeof loc === 'string') locSet.add(loc.trim())
+    })
+    return Array.from(locSet)
+      .filter(Boolean)
+      .sort((a, b) => a.localeCompare(b))
+  }, [geoRiskSectors, geoDangerStretches, loadedGeoLayers])
+
+  // Handlers para clique em setor e trecho IPT levando para a ficha técnica pelo identificador único
+  const handleSectorClick = (sectorRecordOrLayer: any) => {
+    if (onSelectItem) {
+      onSelectItem('risk_sector', sectorRecordOrLayer)
+    }
+    const targetId = sectorRecordOrLayer.id || sectorRecordOrLayer.code
+    if (targetId) {
+      navigate(`/setores-risco?id=${encodeURIComponent(targetId)}`)
+    }
+  }
+
+  const handleStretchClick = (stretchRecordOrLayer: any) => {
+    if (onSelectItem) {
+      onSelectItem('danger_stretch', stretchRecordOrLayer)
+    }
+    const targetId = stretchRecordOrLayer.id || stretchRecordOrLayer.code
+    if (targetId) {
+      navigate(`/setores-risco?id=${encodeURIComponent(targetId)}`)
+    }
+  }
   // Validate initial center
   const validCenter: [number, number] = useMemo(() => {
     if (
@@ -812,145 +867,398 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             )
           })}
 
-        {/* Render Setores de Risco Oficiais (Polígonos coloridos por R1-R4) */}
-        {showRiskSectorsGeo &&
-          loadedGeoLayers
-            .filter(
-              (l) => l.layer_type === 'setores_risco' || l.layer_type === 'areas_avaliacao_risco',
-            )
-            .filter((l) => riskFilter === 'all' || l.risk_level === riskFilter)
-            .map((layer) => {
-              if (!layer.geometry_geojson) return null
-              try {
-                const geom = JSON.parse(layer.geometry_geojson)
-                let positions: any = []
-                if (geom.type === 'Polygon') {
-                  positions = geom.coordinates.map((ring: any[]) =>
-                    ring.map((pt: any[]) => [pt[1], pt[0]]),
+        {/* Camada 1: Setores de Risco — IPT (Polígonos independentes com identificação por clique e filtros) */}
+        {showRiskSectorsGeo && (
+          <>
+            {/* 1.1: Polígonos vinculados diretamente na tabela risk_sectors */}
+            {geoRiskSectors
+              .filter((sector) => typeFilter === 'all' || typeFilter === 'setor')
+              .filter((sector) => {
+                if (riskFilter === 'all') return true
+                const lvl = (sector.risk_level || sector.danger_grade || '').toUpperCase()
+                return lvl.includes(riskFilter)
+              })
+              .filter((sector) => {
+                if (localityFilter === 'all') return true
+                const loc = `${sector.location || ''} ${sector.area_name || ''}`.toLowerCase()
+                return loc.includes(localityFilter.toLowerCase())
+              })
+              .map((sector) => {
+                if (!sector.geometry_geojson) return null
+                try {
+                  const geom = JSON.parse(sector.geometry_geojson)
+                  let positions: any = []
+                  if (geom.type === 'Polygon') {
+                    positions = geom.coordinates.map((ring: any[]) =>
+                      ring.map((pt: any[]) => [pt[1], pt[0]]),
+                    )
+                  } else if (geom.type === 'MultiPolygon') {
+                    positions = geom.coordinates.map((poly: any[]) =>
+                      poly.map((ring: any[]) => ring.map((pt: any[]) => [pt[1], pt[0]])),
+                    )
+                  } else {
+                    return null
+                  }
+
+                  const rLevel = sector.risk_level || sector.danger_grade || 'R2'
+                  const isR4 = rLevel.includes('R4') || rLevel.includes('P4')
+                  const isR3 = rLevel.includes('R3') || rLevel.includes('P3')
+                  const isR1 = rLevel.includes('R1') || rLevel.includes('P1')
+                  const color = isR4 ? '#b91c1c' : isR3 ? '#ea580c' : isR1 ? '#059669' : '#d97706'
+                  const fillColor = isR4
+                    ? '#ef4444'
+                    : isR3
+                      ? '#f97316'
+                      : isR1
+                        ? '#10b981'
+                        : '#f59e0b'
+
+                  return (
+                    <Polygon
+                      key={`rs-${sector.id}`}
+                      positions={positions}
+                      pathOptions={{
+                        color,
+                        fillColor,
+                        fillOpacity: 0.45,
+                        weight: 2,
+                      }}
+                      eventHandlers={{
+                        click: (e) => {
+                          L.DomEvent.stopPropagation(e)
+                          handleSectorClick(sector)
+                        },
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-1 min-w-[240px] text-xs space-y-1.5">
+                          <div className="flex items-center justify-between border-b pb-1 font-bold">
+                            <span className="text-slate-900">
+                              {sector.code || sector.area_name}
+                            </span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] text-white font-bold bg-slate-800">
+                              {rLevel}
+                            </span>
+                          </div>
+                          <p className="text-slate-600">
+                            <strong>Localidade:</strong>{' '}
+                            {sector.location || sector.area_name || '-'}
+                          </p>
+                          <p className="text-slate-600">
+                            <strong>Processo:</strong>{' '}
+                            {sector.process_type || 'Escorregamento / Risco Geológico'}
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            <strong>Fonte:</strong>{' '}
+                            {sector.import_source || 'IPT · Síntese 29/11/2024'}
+                          </p>
+                          <div className="pt-1 border-t flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleSectorClick(sector)}
+                              className="px-2 py-1 bg-blue-600 text-white rounded text-[11px] font-semibold hover:bg-blue-700 w-full"
+                            >
+                              Abrir Ficha do Setor
+                            </button>
+                          </div>
+                        </div>
+                      </Popup>
+                    </Polygon>
                   )
-                } else if (geom.type === 'MultiPolygon') {
-                  positions = geom.coordinates.map((poly: any[]) =>
-                    poly.map((ring: any[]) => ring.map((pt: any[]) => [pt[1], pt[0]])),
-                  )
-                } else {
+                } catch {
                   return null
                 }
+              })}
 
-                const rLevel = layer.risk_level || 'R2'
-                let color = '#d97706'
-                let fillColor = '#f59e0b'
-                if (rLevel === 'R4') {
-                  color = '#b91c1c'
-                  fillColor = '#ef4444'
-                } else if (rLevel === 'R3') {
-                  color = '#ea580c'
-                  fillColor = '#f97316'
-                } else if (rLevel === 'R1') {
-                  color = '#059669'
-                  fillColor = '#10b981'
-                }
+            {/* 1.2: Polígonos de geo_layers (camada Setores de Risco — IPT / setores_risco) */}
+            {loadedGeoLayers
+              .filter(
+                (l) =>
+                  l.layer_type === 'setores_risco' || l.layer_name === 'Setores de Risco — IPT',
+              )
+              .filter((l) => typeFilter === 'all' || typeFilter === 'setor')
+              .filter((l) => {
+                if (riskFilter === 'all') return true
+                const lvl = (l.risk_level || l.grade || '').toUpperCase()
+                return lvl.includes(riskFilter)
+              })
+              .filter((l) => {
+                if (localityFilter === 'all') return true
+                const loc = `${l.locality || ''} ${l.name || ''}`.toLowerCase()
+                return loc.includes(localityFilter.toLowerCase())
+              })
+              .map((layer) => {
+                if (!layer.geometry_geojson) return null
+                try {
+                  const geom = JSON.parse(layer.geometry_geojson)
+                  let positions: any = []
+                  if (geom.type === 'Polygon') {
+                    positions = geom.coordinates.map((ring: any[]) =>
+                      ring.map((pt: any[]) => [pt[1], pt[0]]),
+                    )
+                  } else if (geom.type === 'MultiPolygon') {
+                    positions = geom.coordinates.map((poly: any[]) =>
+                      poly.map((ring: any[]) => ring.map((pt: any[]) => [pt[1], pt[0]])),
+                    )
+                  } else {
+                    return null
+                  }
 
-                return (
-                  <Polygon
-                    key={layer.id}
-                    positions={positions}
-                    pathOptions={{
-                      color,
-                      fillColor,
-                      fillOpacity: 0.45,
-                      weight: 2,
-                    }}
-                  >
-                    <Popup>
-                      <div className="p-1 min-w-[220px] text-xs space-y-1">
-                        <div className="flex items-center justify-between border-b pb-1 font-bold">
-                          <span className="text-slate-900">{layer.name || layer.code}</span>
-                          <span
-                            className={`px-1.5 py-0.5 rounded text-[10px] text-white font-bold ${
-                              rLevel === 'R4'
-                                ? 'bg-red-600'
-                                : rLevel === 'R3'
-                                  ? 'bg-orange-500'
-                                  : rLevel === 'R2'
-                                    ? 'bg-amber-500'
-                                    : 'bg-emerald-600'
-                            }`}
-                          >
-                            {rLevel}
-                          </span>
+                  const rLevel = layer.risk_level || 'R2'
+                  const color =
+                    rLevel === 'R4'
+                      ? '#b91c1c'
+                      : rLevel === 'R3'
+                        ? '#ea580c'
+                        : rLevel === 'R1'
+                          ? '#059669'
+                          : '#d97706'
+                  const fillColor =
+                    rLevel === 'R4'
+                      ? '#ef4444'
+                      : rLevel === 'R3'
+                        ? '#f97316'
+                        : rLevel === 'R1'
+                          ? '#10b981'
+                          : '#f59e0b'
+
+                  return (
+                    <Polygon
+                      key={`gl-sector-${layer.id}`}
+                      positions={positions}
+                      pathOptions={{
+                        color,
+                        fillColor,
+                        fillOpacity: 0.45,
+                        weight: 2,
+                      }}
+                      eventHandlers={{
+                        click: (e) => {
+                          L.DomEvent.stopPropagation(e)
+                          handleSectorClick(layer)
+                        },
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-1 min-w-[240px] text-xs space-y-1.5">
+                          <div className="flex items-center justify-between border-b pb-1 font-bold">
+                            <span className="text-slate-900">{layer.name || layer.code}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] text-white font-bold bg-slate-800">
+                              {rLevel}
+                            </span>
+                          </div>
+                          <p className="text-slate-600">
+                            <strong>Código:</strong> {layer.code || '-'}
+                          </p>
+                          <p className="text-slate-600">
+                            <strong>Processo:</strong> {layer.process_type || 'Setor de Risco IPT'}
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            <strong>Fonte:</strong>{' '}
+                            {layer.source_file || 'IPT · Síntese 29/11/2024'}
+                          </p>
+                          <div className="pt-1 border-t flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleSectorClick(layer)}
+                              className="px-2 py-1 bg-blue-600 text-white rounded text-[11px] font-semibold hover:bg-blue-700 w-full"
+                            >
+                              Abrir Ficha do Setor
+                            </button>
+                          </div>
                         </div>
-                        <p className="text-slate-600">
-                          <strong>Código:</strong> {layer.code || '-'}
-                        </p>
-                        <p className="text-slate-600">
-                          <strong>Processo:</strong>{' '}
-                          {layer.process_type || 'Escorregamento/Enxurrada'}
-                        </p>
-                        <p className="text-[10px] text-slate-500">
-                          <strong>Fonte:</strong> {layer.source_file}
-                        </p>
-                      </div>
-                    </Popup>
-                  </Polygon>
-                )
-              } catch (_) {
-                return null
-              }
-            })}
-
-        {/* Render Trechos de Perigo Oficiais (Linhas com rótulo) */}
-        {showDangerStretchesGeo &&
-          loadedGeoLayers
-            .filter((l) => l.layer_type === 'trechos_perigo')
-            .filter((l) => riskFilter === 'all' || l.risk_level === riskFilter)
-            .map((layer) => {
-              if (!layer.geometry_geojson) return null
-              try {
-                const geom = JSON.parse(layer.geometry_geojson)
-                let positions: any = []
-                if (geom.type === 'LineString') {
-                  positions = geom.coordinates.map((pt: any[]) => [pt[1], pt[0]])
-                } else if (geom.type === 'MultiLineString') {
-                  positions = geom.coordinates.map((line: any[]) =>
-                    line.map((pt: any[]) => [pt[1], pt[0]]),
+                      </Popup>
+                    </Polygon>
                   )
-                } else {
+                } catch {
                   return null
                 }
+              })}
+          </>
+        )}
 
-                const rLevel = layer.risk_level || 'R3'
-                const color = rLevel === 'R4' ? '#dc2626' : rLevel === 'R3' ? '#ea580c' : '#d97706'
+        {/* Camada 2: Trechos de Enxurrada — IPT (Linhas, kind=trecho / process=ENX com filtros e clique) */}
+        {showDangerStretchesGeo && (
+          <>
+            {/* 2.1: Linhas vinculadas diretamente na tabela danger_stretches */}
+            {geoDangerStretches
+              .filter((stretch) => typeFilter === 'all' || typeFilter === 'trecho')
+              .filter((stretch) => {
+                if (riskFilter === 'all') return true
+                const lvl = (stretch.risk_level || stretch.danger_grade || '').toUpperCase()
+                return lvl.includes(riskFilter)
+              })
+              .filter((stretch) => {
+                if (localityFilter === 'all') return true
+                const loc = `${stretch.location || ''} ${stretch.area_name || ''}`.toLowerCase()
+                return loc.includes(localityFilter.toLowerCase())
+              })
+              .map((stretch) => {
+                if (!stretch.geometry_geojson) return null
+                try {
+                  const geom = JSON.parse(stretch.geometry_geojson)
+                  let positions: any = []
+                  if (geom.type === 'LineString') {
+                    positions = geom.coordinates.map((pt: any[]) => [pt[1], pt[0]])
+                  } else if (geom.type === 'MultiLineString') {
+                    positions = geom.coordinates.map((line: any[]) =>
+                      line.map((pt: any[]) => [pt[1], pt[0]]),
+                    )
+                  } else {
+                    return null
+                  }
 
-                return (
-                  <Polyline
-                    key={layer.id}
-                    positions={positions}
-                    pathOptions={{
-                      color,
-                      weight: 4,
-                      opacity: 0.85,
-                    }}
-                  >
-                    <Popup>
-                      <div className="p-1 min-w-[200px] text-xs space-y-1">
-                        <div className="flex items-center justify-between border-b pb-1 font-bold">
-                          <span className="text-slate-900">{layer.name || layer.code}</span>
-                          <span className="text-orange-600 font-bold">{rLevel}</span>
+                  const rLevel = stretch.risk_level || stretch.danger_grade || 'P1'
+                  const color = rLevel.includes('4')
+                    ? '#dc2626'
+                    : rLevel.includes('3')
+                      ? '#ea580c'
+                      : rLevel.includes('2')
+                        ? '#d97706'
+                        : '#2563eb'
+
+                  return (
+                    <Polyline
+                      key={`ds-${stretch.id}`}
+                      positions={positions}
+                      pathOptions={{
+                        color,
+                        weight: 4,
+                        opacity: 0.85,
+                      }}
+                      eventHandlers={{
+                        click: (e) => {
+                          L.DomEvent.stopPropagation(e)
+                          handleStretchClick(stretch)
+                        },
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-1 min-w-[240px] text-xs space-y-1.5">
+                          <div className="flex items-center justify-between border-b pb-1 font-bold">
+                            <span className="text-slate-900">{stretch.code}</span>
+                            <span className="px-1.5 py-0.5 rounded text-[10px] text-white font-bold bg-blue-700">
+                              {rLevel}
+                            </span>
+                          </div>
+                          <p className="text-slate-600">
+                            <strong>Localidade:</strong>{' '}
+                            {stretch.location || stretch.area_name || '-'}
+                          </p>
+                          <p className="text-slate-600">
+                            <strong>Processo:</strong> {stretch.process_type || 'Enxurrada (ENX)'}
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            <strong>Fonte:</strong>{' '}
+                            {stretch.import_source ||
+                              'IPT · Trechos_perigo.gpkg + síntese 29/11/2024'}
+                          </p>
+                          <div className="pt-1 border-t flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleStretchClick(stretch)}
+                              className="px-2 py-1 bg-blue-600 text-white rounded text-[11px] font-semibold hover:bg-blue-700 w-full"
+                            >
+                              Abrir Ficha do Trecho
+                            </button>
+                          </div>
                         </div>
-                        <p className="text-slate-600">
-                          <strong>Trecho:</strong> {layer.code}
-                        </p>
-                        <p className="text-[10px] text-slate-500">
-                          <strong>Fonte:</strong> {layer.source_file}
-                        </p>
-                      </div>
-                    </Popup>
-                  </Polyline>
-                )
-              } catch (_) {
-                return null
-              }
-            })}
+                      </Popup>
+                    </Polyline>
+                  )
+                } catch {
+                  return null
+                }
+              })}
+
+            {/* 2.2: Linhas de geo_layers (camada Trechos de Enxurrada — IPT / trechos_perigo) */}
+            {loadedGeoLayers
+              .filter(
+                (l) =>
+                  l.layer_type === 'trechos_perigo' ||
+                  l.layer_name === 'Trechos de Enxurrada — IPT',
+              )
+              .filter((l) => typeFilter === 'all' || typeFilter === 'trecho')
+              .filter((l) => {
+                if (riskFilter === 'all') return true
+                const lvl = (l.risk_level || l.grade || '').toUpperCase()
+                return lvl.includes(riskFilter)
+              })
+              .filter((l) => {
+                if (localityFilter === 'all') return true
+                const loc = `${l.locality || ''} ${l.name || ''}`.toLowerCase()
+                return loc.includes(localityFilter.toLowerCase())
+              })
+              .map((layer) => {
+                if (!layer.geometry_geojson) return null
+                try {
+                  const geom = JSON.parse(layer.geometry_geojson)
+                  let positions: any = []
+                  if (geom.type === 'LineString') {
+                    positions = geom.coordinates.map((pt: any[]) => [pt[1], pt[0]])
+                  } else if (geom.type === 'MultiLineString') {
+                    positions = geom.coordinates.map((line: any[]) =>
+                      line.map((pt: any[]) => [pt[1], pt[0]]),
+                    )
+                  } else {
+                    return null
+                  }
+
+                  const rLevel = layer.risk_level || 'P1'
+                  const color = rLevel.includes('4')
+                    ? '#dc2626'
+                    : rLevel.includes('3')
+                      ? '#ea580c'
+                      : '#2563eb'
+
+                  return (
+                    <Polyline
+                      key={`gl-stretch-${layer.id}`}
+                      positions={positions}
+                      pathOptions={{
+                        color,
+                        weight: 4,
+                        opacity: 0.85,
+                      }}
+                      eventHandlers={{
+                        click: (e) => {
+                          L.DomEvent.stopPropagation(e)
+                          handleStretchClick(layer)
+                        },
+                      }}
+                    >
+                      <Popup>
+                        <div className="p-1 min-w-[240px] text-xs space-y-1.5">
+                          <div className="flex items-center justify-between border-b pb-1 font-bold">
+                            <span className="text-slate-900">{layer.name || layer.code}</span>
+                            <span className="text-blue-700 font-bold">{rLevel}</span>
+                          </div>
+                          <p className="text-slate-600">
+                            <strong>Trecho:</strong> {layer.code}
+                          </p>
+                          <p className="text-[10px] text-slate-500">
+                            <strong>Fonte:</strong>{' '}
+                            {layer.source_file || 'IPT · Trechos_perigo.gpkg + síntese 29/11/2024'}
+                          </p>
+                          <div className="pt-1 border-t flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => handleStretchClick(layer)}
+                              className="px-2 py-1 bg-blue-600 text-white rounded text-[11px] font-semibold hover:bg-blue-700 w-full"
+                            >
+                              Abrir Ficha do Trecho
+                            </button>
+                          </div>
+                        </div>
+                      </Popup>
+                    </Polyline>
+                  )
+                } catch {
+                  return null
+                }
+              })}
+          </>
+        )}
 
         {/* Render Áreas de Inundação Oficial */}
         {showInundationGeo &&
@@ -1101,19 +1409,70 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               Ocorrências ({occurrences.length})
             </Button>
 
+            {/* Camada 1: Pontes e Aduelas — Levantamento Municipal (pontos) */}
             <Button
               size="sm"
               variant="ghost"
               onClick={() => setShowInfrastructures(!showInfrastructures)}
               className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
                 showInfrastructures
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
                   : 'text-slate-500 hover:text-slate-900'
               }`}
+              title="Pontes e Aduelas — Levantamento Municipal (camada independente)"
             >
               <Building2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-              Pontes & Aduelas (
+              Pontes e Aduelas — Levantamento Municipal (
               {strategicInfrastructures.filter((i) => i.latitude && i.longitude).length})
+            </Button>
+
+            {/* Camada 2: Setores de Risco — IPT (Polígonos) */}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowRiskSectorsGeo(!showRiskSectorsGeo)}
+              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                showRiskSectorsGeo
+                  ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+              title="Setores de Risco — IPT (Polígonos independentes)"
+            >
+              <Layers className="w-3.5 h-3.5 mr-1 text-orange-600" />
+              Setores de Risco — IPT (
+              {geoRiskSectors.length > 0
+                ? geoRiskSectors.length
+                : loadedGeoLayers.filter(
+                    (l) =>
+                      l.layer_type === 'setores_risco' ||
+                      l.layer_name === 'Setores de Risco — IPT' ||
+                      l.layer_type === 'areas_avaliacao_risco',
+                  ).length}
+              )
+            </Button>
+
+            {/* Camada 3: Trechos de Enxurrada — IPT (Linhas, kind=trecho / process=ENX) */}
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowDangerStretchesGeo(!showDangerStretchesGeo)}
+              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                showDangerStretchesGeo
+                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                  : 'text-slate-500 hover:text-slate-900'
+              }`}
+              title="Trechos de Enxurrada — IPT (Linhas, process=ENX)"
+            >
+              <Navigation className="w-3.5 h-3.5 mr-1 text-blue-600" />
+              Trechos de Enxurrada — IPT (
+              {geoDangerStretches.length > 0
+                ? geoDangerStretches.length
+                : loadedGeoLayers.filter(
+                    (l) =>
+                      l.layer_type === 'trechos_perigo' ||
+                      l.layer_name === 'Trechos de Enxurrada — IPT',
+                  ).length}
+              )
             </Button>
 
             <Button
@@ -1127,7 +1486,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               }`}
             >
               <Layers className="w-3.5 h-3.5 mr-1 text-amber-600" />
-              Áreas de Risco ({areas.length})
+              Áreas ({areas.length})
             </Button>
 
             <Button
@@ -1156,43 +1515,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             >
               <Users className="w-3.5 h-3.5 mr-1 text-purple-600" />
               Equipes ({teams.length})
-            </Button>
-
-            {/* Alternadores das Novas Camadas Oficiais de Ibiúna */}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowRiskSectorsGeo(!showRiskSectorsGeo)}
-              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
-                showRiskSectorsGeo
-                  ? 'bg-orange-100 text-orange-800 border border-orange-300'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5 mr-1 text-orange-600" />
-              Setores GPKG (
-              {
-                loadedGeoLayers.filter(
-                  (l) =>
-                    l.layer_type === 'setores_risco' || l.layer_type === 'areas_avaliacao_risco',
-                ).length
-              }
-              )
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowDangerStretchesGeo(!showDangerStretchesGeo)}
-              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
-                showDangerStretchesGeo
-                  ? 'bg-red-100 text-red-800 border border-red-300'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <Navigation className="w-3.5 h-3.5 mr-1 text-red-600" />
-              Trechos GPKG (
-              {loadedGeoLayers.filter((l) => l.layer_type === 'trechos_perigo').length})
             </Button>
 
             <Button
@@ -1236,50 +1558,119 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </Button>
           </div>
 
-          {/* Filtro R1-R4 */}
-          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-md px-2 py-1 rounded-lg border border-slate-300 shadow-md text-xs">
-            <span className="font-semibold text-slate-600 mr-1">Grau:</span>
-            {(['all', 'R4', 'R3', 'R2', 'R1'] as const).map((r) => (
+          {/* Filtros Integrados IPT: Tipo (Setor/Trecho), Localidade e Grau de Risco */}
+          <div className="flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md px-2 py-1 rounded-lg border border-slate-300 shadow-md text-xs">
+            {/* Tipo */}
+            <div className="flex items-center gap-1 mr-1">
+              <span className="font-semibold text-slate-600 text-[11px]">Tipo:</span>
               <button
-                key={r}
                 type="button"
-                onClick={() => setRiskFilter(r)}
-                className={`px-1.5 py-0.5 rounded text-[11px] font-bold transition-all ${
-                  riskFilter === r
-                    ? r === 'R4'
-                      ? 'bg-red-600 text-white'
-                      : r === 'R3'
-                        ? 'bg-orange-500 text-white'
-                        : r === 'R2'
-                          ? 'bg-amber-500 text-white'
-                          : r === 'R1'
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-slate-800 text-white'
+                onClick={() => setTypeFilter('all')}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                  typeFilter === 'all'
+                    ? 'bg-slate-800 text-white'
                     : 'text-slate-600 hover:bg-slate-100'
                 }`}
               >
-                {r === 'all' ? 'Todos' : r}
+                Todos
               </button>
-            ))}
+              <button
+                type="button"
+                onClick={() => setTypeFilter('setor')}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                  typeFilter === 'setor'
+                    ? 'bg-orange-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Setores
+              </button>
+              <button
+                type="button"
+                onClick={() => setTypeFilter('trecho')}
+                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                  typeFilter === 'trecho'
+                    ? 'bg-blue-600 text-white'
+                    : 'text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                Trechos
+              </button>
+            </div>
+
+            {/* Filtro R1-R4 / P1-P4 */}
+            <div className="flex items-center gap-1 mr-1 border-l border-slate-200 pl-1.5">
+              <span className="font-semibold text-slate-600 text-[11px]">Grau:</span>
+              {(['all', 'R4', 'R3', 'R2', 'R1'] as const).map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setRiskFilter(r)}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                    riskFilter === r
+                      ? r === 'R4'
+                        ? 'bg-red-600 text-white'
+                        : r === 'R3'
+                          ? 'bg-orange-500 text-white'
+                          : r === 'R2'
+                            ? 'bg-amber-500 text-white'
+                            : r === 'R1'
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-slate-800 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  {r === 'all' ? 'Todos' : r}
+                </button>
+              ))}
+            </div>
+
+            {/* Localidade (select compacto) */}
+            {availableLocalities.length > 0 && (
+              <div className="flex items-center gap-1 border-l border-slate-200 pl-1.5">
+                <span className="font-semibold text-slate-600 text-[11px]">Localidade:</span>
+                <select
+                  value={localityFilter}
+                  onChange={(e) => setLocalityFilter(e.target.value)}
+                  className="text-[11px] bg-slate-50 border border-slate-300 rounded px-1.5 py-0.5 max-w-[130px] truncate text-slate-700"
+                >
+                  <option value="all">Todas ({availableLocalities.length})</option>
+                  {availableLocalities.map((loc) => (
+                    <option key={loc} value={loc}>
+                      {loc}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
           </div>
         </div>
       )}
 
-      {/* Mini Legend Footer */}
-      <div className="absolute bottom-2 right-2 hidden sm:flex items-center gap-3 bg-white/95 backdrop-blur-md px-2.5 py-1 rounded-md border border-slate-300 text-[10px] text-slate-700 shadow-sm z-[400] pointer-events-none font-medium">
+      {/* Legenda Oficial Completa de Camadas */}
+      <div className="absolute bottom-2 right-2 hidden sm:flex items-center gap-3 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-md border border-slate-300 text-[10px] text-slate-700 shadow-md z-[400] font-medium">
+        <span className="flex items-center gap-1 font-bold text-slate-900 mr-1">Legenda:</span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-red-600" /> Crítico
+          <span className="w-2.5 h-2.5 rounded bg-emerald-600 border border-white shadow-xs" />{' '}
+          Pontes & Aduelas
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-orange-500" /> Alto
+          <span className="w-2.5 h-2.5 rounded bg-orange-500 border border-white shadow-xs" />{' '}
+          Setores IPT (Polígonos)
         </span>
         <span className="flex items-center gap-1">
-          <span className="w-2 h-2 rounded-full bg-emerald-600" /> Ponte/Aduela
+          <span className="w-3 h-1 bg-blue-600 rounded-sm" /> Trechos ENX IPT (Linhas)
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-full bg-red-600" /> R4/P4 Muito Alto
+        </span>
+        <span className="flex items-center gap-1">
+          <span className="w-2.5 h-2.5 rounded-full bg-orange-500" /> R3/P3 Alto
         </span>
         {(riskSectorsCount > 0 || dangerStretchesCount > 0) && (
-          <span className="flex items-center gap-1 text-slate-500">
+          <span className="flex items-center gap-1 text-slate-500 border-l border-slate-200 pl-2">
             <span className="w-2 h-2 rounded-full border border-dashed border-slate-400" />
-            {riskSectorsCount + dangerStretchesCount} setores/trechos (sem geom.)
+            {riskSectorsCount + dangerStretchesCount} setores/trechos cadastrados
           </span>
         )}
       </div>

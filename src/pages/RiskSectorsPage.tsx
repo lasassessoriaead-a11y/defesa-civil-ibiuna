@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams, useLocation } from 'react-router-dom'
 import {
   ShieldAlert,
   Search,
@@ -20,6 +20,8 @@ import {
   ArrowRight,
   RefreshCw,
   SlidersHorizontal,
+  Map as MapIcon,
+  ExternalLink,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -106,21 +108,27 @@ export const RiskSectorsPage: React.FC = () => {
   const [filterProcess, setFilterProcess] = useState<string>('all')
   const [filterValidation, setFilterValidation] = useState<string>('all')
 
+  const [searchParams, setSearchParams] = useSearchParams()
+  const urlParamId = searchParams.get('id')
+
   // Detalhe Modal
   const [selectedItem, setSelectedItem] = useState<UnifiedRiskItem | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [itemNotFound, setItemNotFound] = useState(false)
   const [relatedOccurrences, setRelatedOccurrences] = useState<Occurrence[]>([])
   const [isLoadingOccs, setIsLoadingOccs] = useState(false)
 
   const loadData = async () => {
     setIsLoading(true)
     try {
+      const munFilter = user?.municipality ? `municipality = "${user.municipality}"` : undefined
       const [secs, strs] = await Promise.all([
-        riskSectorsService.list(undefined, 'code', 600),
-        dangerStretchesService.list(undefined, 'code', 600),
+        riskSectorsService.list(munFilter, 'code', 600),
+        dangerStretchesService.list(munFilter, 'code', 600),
       ])
       setSectors(secs)
       setStretches(strs)
+      return { secs, strs }
     } catch (e: any) {
       console.error(e)
       toast({
@@ -128,14 +136,27 @@ export const RiskSectorsPage: React.FC = () => {
         title: 'Erro ao carregar setores',
         description: e.message || 'Verifique a conexão.',
       })
+      return { secs: [], strs: [] }
     } finally {
       setIsLoading(false)
     }
   }
 
-  useEffect(() => {
-    loadData()
-  }, [])
+  const handleReturnToMap = () => {
+    setIsDetailOpen(false)
+    setSearchParams({}, { replace: true })
+    navigate('/', { replace: false })
+  }
+
+  const handleCloseDetailDialog = (open: boolean) => {
+    setIsDetailOpen(open)
+    if (!open) {
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.delete('id')
+      setSearchParams(nextParams, { replace: true })
+      setItemNotFound(false)
+    }
+  }
 
   // Unifica para tabela fluida
   const unifiedList: UnifiedRiskItem[] = [
@@ -204,11 +225,13 @@ export const RiskSectorsPage: React.FC = () => {
 
   const openDetails = async (item: UnifiedRiskItem) => {
     setSelectedItem(item)
+    setItemNotFound(false)
     setIsDetailOpen(true)
     setIsLoadingOccs(true)
     try {
+      const munFilter = user?.municipality ? ` && municipality = "${user.municipality}"` : ''
       const field = item.kind === 'sector' ? 'risk_sector' : 'danger_stretch'
-      const occs = await occurrencesService.list(`${field} = "${item.id}"`)
+      const occs = await occurrencesService.list(`${field} = "${item.id}"${munFilter}`)
       setRelatedOccurrences(occs)
     } catch {
       setRelatedOccurrences([])
@@ -216,6 +239,175 @@ export const RiskSectorsPage: React.FC = () => {
       setIsLoadingOccs(false)
     }
   }
+
+  // Observa ?id=... da URL para abrir a ficha do setor ou trecho pelo identificador único
+  useEffect(() => {
+    const initFromUrl = async () => {
+      const { secs, strs } = await loadData()
+      if (urlParamId) {
+        const foundSector = secs.find((s) => s.id === urlParamId)
+        if (foundSector) {
+          openDetails({
+            id: foundSector.id,
+            kind: 'sector',
+            code: foundSector.code,
+            sectorOrStretchNum: foundSector.sector_number,
+            zone: foundSector.zone,
+            areaNumber: foundSector.area_number,
+            areaName: foundSector.area_name,
+            plateNumber: foundSector.plate_number,
+            location: foundSector.location,
+            processType: foundSector.process_type,
+            dangerGrade: foundSector.danger_grade,
+            vulnerabilityGrade: foundSector.vulnerability_grade,
+            riskGrade: foundSector.risk_grade,
+            riskLevel: foundSector.risk_level || 'indefinido',
+            affectedBuildings: foundSector.affected_buildings,
+            affectedDwellings: foundSector.affected_dwellings,
+            affectedResidents: foundSector.affected_residents,
+            affectedRoadsLength: foundSector.affected_roads_length,
+            disasterHistory: foundSector.disaster_history,
+            regionalRiskInfo: foundSector.regional_risk_info,
+            expectedProcesses: foundSector.expected_processes,
+            description: foundSector.description,
+            recommendations: foundSector.recommendations,
+            validationStatus: foundSector.validation_status,
+            geometryStatus: foundSector.geometry_status,
+            importSource: foundSector.import_source,
+            importBatchId: foundSector.import_batch_id,
+            rawAttributes: foundSector.raw_attributes,
+            created: foundSector.created,
+          })
+          return
+        }
+
+        const foundStretch = strs.find((t) => t.id === urlParamId)
+        if (foundStretch) {
+          openDetails({
+            id: foundStretch.id,
+            kind: 'stretch',
+            code: foundStretch.code,
+            sectorOrStretchNum: foundStretch.stretch_number,
+            zone: foundStretch.zone,
+            areaNumber: foundStretch.area_number,
+            areaName: foundStretch.area_name,
+            location: foundStretch.location,
+            processType: foundStretch.process_type,
+            dangerGrade: foundStretch.danger_grade,
+            vulnerabilityGrade: foundStretch.vulnerability_grade,
+            riskGrade: foundStretch.risk_grade,
+            riskLevel: foundStretch.risk_level || 'indefinido',
+            affectedBuildings: undefined,
+            affectedDwellings: foundStretch.affected_dwellings,
+            affectedResidents: foundStretch.affected_residents,
+            affectedRoadsLength: foundStretch.affected_roads_length,
+            disasterHistory: foundStretch.disaster_history,
+            regionalRiskInfo: undefined,
+            expectedProcesses: undefined,
+            description: foundStretch.description,
+            recommendations: foundStretch.recommendations,
+            validationStatus: foundStretch.validation_status,
+            geometryStatus: foundStretch.geometry_status,
+            importSource: foundStretch.import_source,
+            importBatchId: foundStretch.import_batch_id,
+            rawAttributes: foundStretch.raw_attributes,
+            created: foundStretch.created,
+          })
+          return
+        }
+
+        // Se não encontrou nem em setor nem em trecho, tenta buscar via API
+        try {
+          const s = await riskSectorsService.get(urlParamId)
+          if (
+            s &&
+            (!user?.municipality || !s.municipality || s.municipality === user.municipality)
+          ) {
+            openDetails({
+              id: s.id,
+              kind: 'sector',
+              code: s.code,
+              sectorOrStretchNum: s.sector_number,
+              zone: s.zone,
+              areaNumber: s.area_number,
+              areaName: s.area_name,
+              plateNumber: s.plate_number,
+              location: s.location,
+              processType: s.process_type,
+              dangerGrade: s.danger_grade,
+              vulnerabilityGrade: s.vulnerability_grade,
+              riskGrade: s.risk_grade,
+              riskLevel: s.risk_level || 'indefinido',
+              affectedBuildings: s.affected_buildings,
+              affectedDwellings: s.affected_dwellings,
+              affectedResidents: s.affected_residents,
+              affectedRoadsLength: s.affected_roads_length,
+              disasterHistory: s.disaster_history,
+              regionalRiskInfo: s.regional_risk_info,
+              expectedProcesses: s.expected_processes,
+              description: s.description,
+              recommendations: s.recommendations,
+              validationStatus: s.validation_status,
+              geometryStatus: s.geometry_status,
+              importSource: s.import_source,
+              importBatchId: s.import_batch_id,
+              rawAttributes: s.raw_attributes,
+              created: s.created,
+            })
+            return
+          }
+        } catch (_) {
+          try {
+            const t = await dangerStretchesService.get(urlParamId)
+            if (
+              t &&
+              (!user?.municipality || !t.municipality || t.municipality === user.municipality)
+            ) {
+              openDetails({
+                id: t.id,
+                kind: 'stretch',
+                code: t.code,
+                sectorOrStretchNum: t.stretch_number,
+                zone: t.zone,
+                areaNumber: t.area_number,
+                areaName: t.area_name,
+                location: t.location,
+                processType: t.process_type,
+                dangerGrade: t.danger_grade,
+                vulnerabilityGrade: t.vulnerability_grade,
+                riskGrade: t.risk_grade,
+                riskLevel: t.risk_level || 'indefinido',
+                affectedBuildings: undefined,
+                affectedDwellings: t.affected_dwellings,
+                affectedResidents: t.affected_residents,
+                affectedRoadsLength: t.affected_roads_length,
+                disasterHistory: t.disaster_history,
+                regionalRiskInfo: undefined,
+                expectedProcesses: undefined,
+                description: t.description,
+                recommendations: t.recommendations,
+                validationStatus: t.validation_status,
+                geometryStatus: t.geometry_status,
+                importSource: t.import_source,
+                importBatchId: t.import_batch_id,
+                rawAttributes: t.raw_attributes,
+                created: t.created,
+              })
+              return
+            }
+          } catch (__) {
+            // Nem setor nem trecho encontrado
+          }
+        }
+
+        // Registro não encontrado — NUNCA abrir outro registro
+        setSelectedItem(null)
+        setItemNotFound(true)
+        setIsDetailOpen(true)
+      }
+    }
+    initFromUrl()
+  }, [urlParamId, user?.municipality])
 
   // Filtragem
   const filtered = unifiedList.filter((item) => {
@@ -544,25 +736,72 @@ export const RiskSectorsPage: React.FC = () => {
       </Card>
 
       {/* Modal Completo de Ficha Técnica */}
-      <Dialog open={isDetailOpen} onOpenChange={setIsDetailOpen}>
+      <Dialog open={isDetailOpen} onOpenChange={handleCloseDetailDialog}>
         <DialogContent className="max-w-3xl max-h-[85vh] overflow-y-auto">
-          {selectedItem && (
+          {itemNotFound ? (
+            <div className="p-6 text-center space-y-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 text-red-600 flex items-center justify-center mx-auto">
+                <XCircle className="w-6 h-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-bold text-slate-900">
+                  Setor ou Trecho de Risco Não Encontrado
+                </h3>
+                <p className="text-xs text-slate-500 max-w-md mx-auto">
+                  O registro solicitado (ID: {urlParamId || 'não informado'}) não existe no cadastro
+                  deste município ou pode ter sido removido. Nenhuma outra ficha foi aberta para
+                  evitar confusão técnica.
+                </p>
+              </div>
+              <div className="flex items-center justify-center gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={() => handleCloseDetailDialog(false)}>
+                  Ver Lista Geral
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={handleReturnToMap}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <MapIcon className="w-3.5 h-3.5 mr-1.5" />
+                  Voltar ao mapa
+                </Button>
+              </div>
+            </div>
+          ) : selectedItem ? (
             <>
               <DialogHeader>
-                <div className="flex items-center justify-between">
-                  <DialogTitle className="text-base font-bold flex items-center gap-2">
-                    <ShieldAlert className="w-5 h-5 text-blue-600" />
-                    Ficha Técnica: {selectedItem.code}
-                  </DialogTitle>
-                  <Badge variant="outline" className="capitalize">
-                    {selectedItem.kind === 'sector' ? 'Setor de Risco' : 'Trecho de Perigo'}
-                  </Badge>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                  <div>
+                    <DialogTitle className="text-base font-bold flex items-center gap-2">
+                      <ShieldAlert className="w-5 h-5 text-blue-600" />
+                      Ficha Técnica: {selectedItem.code}
+                      <Badge variant="outline" className="capitalize text-[11px]">
+                        {selectedItem.kind === 'sector' ? 'Setor de Risco' : 'Trecho de Perigo'}
+                      </Badge>
+                    </DialogTitle>
+                    <DialogDescription className="text-xs mt-0.5">
+                      Origem oficial:{' '}
+                      <strong className="text-slate-700">
+                        {selectedItem.importSource?.includes('IPT') ||
+                        selectedItem.importSource?.includes('Síntese')
+                          ? selectedItem.importSource
+                          : 'IPT · Trechos_perigo.gpkg + síntese 29/11/2024'}
+                      </strong>
+                      {selectedItem.importBatchId && ` (Lote: ${selectedItem.importBatchId})`}
+                    </DialogDescription>
+                  </div>
+
+                  {/* Botão de retorno direto preservando estado do mapa */}
+                  <Button
+                    variant="default"
+                    size="sm"
+                    onClick={handleReturnToMap}
+                    className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shrink-0 shadow-sm"
+                  >
+                    <MapIcon className="w-3.5 h-3.5 mr-1.5" />
+                    Voltar ao mapa
+                  </Button>
                 </div>
-                <DialogDescription className="text-xs">
-                  Origem do cadastro:{' '}
-                  {selectedItem.importSource || 'Sintese_Setores_Risco_Trechos_Perigo_2024.xlsx'}
-                  {selectedItem.importBatchId && ` (Lote: ${selectedItem.importBatchId})`}
-                </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4 py-2 text-xs">
@@ -636,14 +875,53 @@ export const RiskSectorsPage: React.FC = () => {
                   </div>
                 )}
 
-                {/* Ocorrências Vinculadas */}
+                {/* Documentos & Prancha do Mapeamento Oficial IPT */}
+                <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <FileText className="w-3.5 h-3.5 text-blue-600" />
+                      Documentos & Pranchas Relacionadas (IPT 2024)
+                    </p>
+                    <span className="text-[10px] text-slate-500">
+                      Vínculo estrito por código documental
+                    </span>
+                  </div>
+
+                  <div className="space-y-1.5 text-[11px]">
+                    <div className="p-2 bg-white rounded border flex items-center justify-between">
+                      <div>
+                        <span className="font-semibold text-slate-900">
+                          {selectedItem.plateNumber
+                            ? `Prancha Técnica Oficial IPT: ${selectedItem.plateNumber}`
+                            : 'Prancha Técnica IPT · Cartografia de Campo'}
+                        </span>
+                        <p className="text-slate-500 text-[10px] mt-0.5">
+                          IPT · Mapeamento de Áreas de Risco e Perigo de Ibiúna/SP (Síntese
+                          29/11/2024)
+                        </p>
+                      </div>
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 text-[10px]">
+                        Oficial IPT
+                      </Badge>
+                    </div>
+
+                    <p className="text-[10px] text-slate-400 italic pt-1">
+                      Regra de integridade: relatórios e pranchas são vinculados exclusivamente por
+                      código documental correspondente ou feição geográfica confirmada, sem
+                      associações numéricas arbitrárias. Acervo do IPT não se mistura com
+                      fotografias operacionais de pontes.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Ocorrências Operacionais Registradas (Separadas de CadEv Histórico) */}
                 <div className="p-3 bg-white rounded-lg border space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="font-bold text-slate-800">
-                      Ocorrências Registradas Vinculadas ({relatedOccurrences.length})
+                      Ocorrências Operacionais Vinculadas ({relatedOccurrences.length})
                     </p>
                     <span className="text-[10px] text-slate-500">
-                      Informação geográfica de apoio
+                      Ocorrências 199/campo vinculadas por georreferenciamento
                     </span>
                   </div>
 
@@ -651,7 +929,8 @@ export const RiskSectorsPage: React.FC = () => {
                     <p className="text-slate-400 italic">Buscando ocorrências vinculadas...</p>
                   ) : relatedOccurrences.length === 0 ? (
                     <p className="text-slate-500 italic text-[11px]">
-                      Nenhuma ocorrência do 199/campo vinculada a este setor/trecho até o momento.
+                      Nenhuma ocorrência operacional do 199 vinculada a este setor/trecho até o
+                      momento.
                     </p>
                   ) : (
                     <div className="space-y-1">
@@ -672,13 +951,26 @@ export const RiskSectorsPage: React.FC = () => {
                 </div>
               </div>
 
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDetailOpen(false)}>
+              <DialogFooter className="flex flex-col sm:flex-row items-center justify-between gap-2">
+                <Button
+                  size="sm"
+                  onClick={handleReturnToMap}
+                  className="bg-blue-600 hover:bg-blue-700 text-white w-full sm:w-auto"
+                >
+                  <MapIcon className="w-3.5 h-3.5 mr-1.5" />
+                  Voltar ao mapa
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleCloseDetailDialog(false)}
+                  className="w-full sm:w-auto"
+                >
                   Fechar
                 </Button>
               </DialogFooter>
             </>
-          )}
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

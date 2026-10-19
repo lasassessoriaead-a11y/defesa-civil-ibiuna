@@ -182,6 +182,7 @@ export const Dashboard: React.FC = () => {
 
   const loadAllData = async () => {
     try {
+      const munFilter = user?.municipality ? `municipality = "${user.municipality}"` : undefined
       const [
         occData,
         shelterData,
@@ -194,16 +195,16 @@ export const Dashboard: React.FC = () => {
         infraData,
         demandData,
       ] = await Promise.all([
-        occurrencesService.list(),
-        sheltersService.list(),
-        teamsService.list(),
-        suppliesService.list(),
-        alertsService.list(),
-        affectedAreasService.list(),
-        riskSectorsService.list(undefined, 'code'),
-        dangerStretchesService.list(undefined, 'code'),
-        strategicInfrastructuresService.list(undefined, 'original_code'),
-        externalDemandsService.list(undefined, '-created'),
+        occurrencesService.list(munFilter),
+        sheltersService.list(munFilter),
+        teamsService.list(munFilter),
+        suppliesService.list(munFilter),
+        alertsService.list(munFilter),
+        affectedAreasService.list(munFilter),
+        riskSectorsService.list(munFilter, 'code', 600),
+        dangerStretchesService.list(munFilter, 'code', 600),
+        strategicInfrastructuresService.list(munFilter, 'original_code', 600),
+        externalDemandsService.list(munFilter, '-created', 600),
       ])
       setOccurrences(occData)
       setShelters(shelterData)
@@ -659,42 +660,74 @@ export const Dashboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Grid de Métricas de Inteligência Territorial */}
+        {/* Grid de Métricas Distintas de Inteligência Territorial */}
         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-          <Card className="border-slate-200 bg-white">
+          {/* Métrica 1: Travessias (Pontes & Aduelas - Levantamento Municipal) */}
+          <Card
+            onClick={() => navigate('/infraestruturas')}
+            className="border-emerald-200 bg-emerald-50/20 hover:bg-emerald-50/40 transition-colors cursor-pointer"
+          >
             <CardContent className="p-4">
-              <p className="text-xs font-medium text-slate-500">Setores de Risco</p>
-              <p className="text-2xl font-bold text-blue-900 mt-1">
-                <AnimatedCount value={riskSectors.length} />
-              </p>
-              <p className="text-[10px] text-slate-400 mt-0.5">Polígonos cadastrados</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 bg-white">
-            <CardContent className="p-4">
-              <p className="text-xs font-medium text-slate-500">Trechos de Perigo</p>
-              <p className="text-2xl font-bold text-amber-900 mt-1">
-                <AnimatedCount value={dangerStretches.length} />
-              </p>
-              <p className="text-[10px] text-slate-400 mt-0.5">Vias monitoradas</p>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 bg-white">
-            <CardContent className="p-4">
-              <p className="text-xs font-medium text-slate-500">Pontes & Aduelas</p>
-              <p className="text-2xl font-bold text-emerald-900 mt-1">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-emerald-800">Pontes e Aduelas</p>
+                <Building2 className="w-4 h-4 text-emerald-600" />
+              </div>
+              <p className="text-2xl font-extrabold text-emerald-950 mt-1">
                 <AnimatedCount value={infrastructures.length} />
               </p>
-              <p className="text-[10px] text-slate-400 mt-0.5">Cadastros de campo</p>
+              <p className="text-[10px] text-emerald-700 mt-0.5 font-medium">
+                Levantamento Municipal (
+                {infrastructures.filter((i) => i.latitude && i.longitude).length} c/ coord.)
+              </p>
             </CardContent>
           </Card>
 
-          <Card className="border-amber-200 bg-amber-50/30">
+          {/* Métrica 2: Setores de Risco (IPT) */}
+          <Card
+            onClick={() => navigate('/setores-risco?tab=sectors')}
+            className="border-blue-200 bg-blue-50/20 hover:bg-blue-50/40 transition-colors cursor-pointer"
+          >
             <CardContent className="p-4">
-              <p className="text-xs font-medium text-amber-700">Pendentes Conferência</p>
-              <p className="text-2xl font-bold text-amber-900 mt-1">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-blue-800">Setores de Risco</p>
+                <Layers className="w-4 h-4 text-blue-600" />
+              </div>
+              <p className="text-2xl font-extrabold text-blue-950 mt-1">
+                <AnimatedCount value={riskSectors.length} />
+              </p>
+              <p className="text-[10px] text-blue-700 mt-0.5 font-medium">
+                Mapeamento IPT (Polígonos)
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Métrica 3: Trechos de Perigo / Enxurrada (IPT) */}
+          <Card
+            onClick={() => navigate('/setores-risco?tab=stretches')}
+            className="border-amber-200 bg-amber-50/20 hover:bg-amber-50/40 transition-colors cursor-pointer"
+          >
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold text-amber-800">Trechos de Perigo</p>
+                <Navigation className="w-4 h-4 text-amber-600" />
+              </div>
+              <p className="text-2xl font-extrabold text-amber-950 mt-1">
+                <AnimatedCount value={dangerStretches.length} />
+              </p>
+              <p className="text-[10px] text-amber-700 mt-0.5 font-medium">
+                IPT (Enxurrada / Linhas)
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Métrica 4: Pontes Pendentes de Conferência */}
+          <Card
+            onClick={() => navigate('/conferencia-pontes')}
+            className="border-amber-200 bg-amber-50/30 hover:bg-amber-100/30 transition-colors cursor-pointer"
+          >
+            <CardContent className="p-4">
+              <p className="text-xs font-medium text-amber-800">Pendentes Conferência</p>
+              <p className="text-2xl font-bold text-amber-950 mt-1">
                 <AnimatedCount
                   value={
                     infrastructures.filter((i) => i.validation_status === 'pendente_conferencia')
@@ -702,7 +735,7 @@ export const Dashboard: React.FC = () => {
                   }
                 />
               </p>
-              <p className="text-[10px] text-amber-600 mt-0.5">Aguardando validação</p>
+              <p className="text-[10px] text-amber-700 mt-0.5">Pontes aguardando validação</p>
             </CardContent>
           </Card>
 
