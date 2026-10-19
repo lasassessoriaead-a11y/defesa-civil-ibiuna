@@ -44,6 +44,7 @@ import {
   type ParseResultSummary,
   type ParsedRiskRow,
 } from '@/services/xlsx-parser-service'
+import { IptGeoJsonPanel } from '@/components/defesa-civil/IptGeoJsonPanel'
 import {
   riskSectorsService,
   dangerStretchesService,
@@ -64,6 +65,9 @@ export const RiskImportPage: React.FC = () => {
   const [importCompleted, setImportCompleted] = useState(false)
   const [importBatches, setImportBatches] = useState<GeoImportBatch[]>([])
   const [isLoadingBatches, setIsLoadingBatches] = useState(false)
+  const [activeImportSection, setActiveImportSection] = useState<
+    'ipt_geojson' | 'xlsx' | 'official_gpkg'
+  >('ipt_geojson')
   const [filterTab, setFilterTab] = useState<
     'all' | 'sectors' | 'stretches' | 'totalizers' | 'rejected'
   >('all')
@@ -323,438 +327,503 @@ export const RiskImportPage: React.FC = () => {
         </div>
       </div>
 
-      {/* PAINEL DOS 14 ARQUIVOS GEOGRÁFICOS OFICIAIS (GPKG / KMZ) */}
-      <Card className="border-blue-200 bg-gradient-to-b from-blue-50/50 to-white shadow-sm">
-        <CardHeader className="pb-3">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <CardTitle className="text-base flex items-center gap-2 text-blue-950 font-bold">
-                <Globe2 className="w-5 h-5 text-blue-600" />
-                Arquivos Geográficos Oficiais de Ibiúna (14 Arquivos GPKG / KMZ)
-              </CardTitle>
-              <CardDescription className="text-xs text-slate-600 mt-1">
-                Importação em lote do repositório público oficial com conversão de EPSG:31983 para
-                EPSG:4326, armazenamento em{' '}
-                <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-800">geo_layers</code>,
-                conciliação e renderização no mapa.
-              </CardDescription>
-            </div>
+      {/* Navegação entre Módulos de Carga Técnica */}
+      <div className="flex border-b border-slate-200">
+        <button
+          onClick={() => setActiveImportSection('ipt_geojson')}
+          className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-2 ${
+            activeImportSection === 'ipt_geojson'
+              ? 'border-emerald-600 text-emerald-800 bg-emerald-50/50'
+              : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <ShieldAlert className="w-4 h-4 text-emerald-600" />
+          Vínculo Geográfico IPT (GeoJSON Oficial)
+          <Badge className="bg-emerald-600 text-white text-[10px] ml-1">Anexo Bad52</Badge>
+        </button>
 
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleImportOfficialGeoFiles(true)}
-                disabled={isOfficialGeoImporting}
-                className="bg-white hover:bg-blue-50 border-blue-200 text-blue-700 text-xs font-semibold"
-              >
-                <Layers className="w-3.5 h-3.5 mr-1" />
-                Importar 4 Camadas Prioritárias
-              </Button>
-              <Button
-                size="sm"
-                onClick={() => handleImportOfficialGeoFiles(false)}
-                disabled={isOfficialGeoImporting}
-                className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm"
-              >
-                {isOfficialGeoImporting ? (
-                  <>
-                    <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
-                    Processando...
-                  </>
-                ) : (
-                  <>
-                    <Download className="w-3.5 h-3.5 mr-1" />
-                    Importar Todos os 14 Arquivos
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
+        <button
+          onClick={() => setActiveImportSection('xlsx')}
+          className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-2 ${
+            activeImportSection === 'xlsx'
+              ? 'border-blue-600 text-blue-800 bg-blue-50/50'
+              : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <FileSpreadsheet className="w-4 h-4 text-blue-600" />
+          Planilha Síntese (.xlsx)
+        </button>
 
-        <CardContent className="space-y-4">
-          <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
-            <Table>
-              <TableHeader className="bg-slate-50 text-[11px]">
-                <TableRow>
-                  <TableHead>Arquivo</TableHead>
-                  <TableHead>Finalidade / Descrição</TableHead>
-                  <TableHead className="w-24">Tamanho</TableHead>
-                  <TableHead className="w-28">Prioridade</TableHead>
-                  <TableHead className="w-48">Status / Progresso</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody className="text-xs">
-                {OFFICIAL_GEO_FILES.map((f) => {
-                  const progress = officialGeoProgressList[f.id]
-                  return (
-                    <TableRow key={f.id} className="hover:bg-slate-50/70">
-                      <TableCell className="font-semibold text-slate-900 font-mono text-[11px]">
-                        {f.filename}
-                      </TableCell>
-                      <TableCell className="text-slate-600 text-xs">{f.description}</TableCell>
-                      <TableCell className="text-slate-500 font-mono text-[11px]">
-                        {f.sizeApprox}
-                      </TableCell>
-                      <TableCell>
-                        {f.isPriority ? (
-                          <Badge className="bg-amber-500 text-white text-[10px]">Prioritária</Badge>
-                        ) : (
-                          <Badge variant="outline" className="text-slate-500 text-[10px]">
-                            Contexto
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        {!progress ? (
-                          <span className="text-slate-400 text-[11px]">Pronto para carga</span>
-                        ) : progress.status === 'completed' ? (
-                          <div className="flex items-center gap-1.5 text-emerald-600 font-semibold text-[11px]">
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>{progress.importedCount || 0} feições gravadas</span>
-                          </div>
-                        ) : progress.status === 'error' ? (
-                          <div className="flex items-center gap-1 text-red-600 text-[11px]">
-                            <XCircle className="w-3.5 h-3.5" />
-                            <span className="truncate max-w-[140px]" title={progress.error}>
-                              {progress.error}
-                            </span>
-                          </div>
-                        ) : (
-                          <div className="space-y-1">
-                            <div className="flex items-center gap-1.5 text-blue-600 text-[11px]">
-                              <RefreshCw className="w-3 h-3 animate-spin" />
-                              <span className="truncate max-w-[140px]">{progress.currentStep}</span>
-                            </div>
-                            {progress.totalRecords && progress.importedCount ? (
-                              <Progress
-                                value={Math.round(
-                                  (progress.importedCount / progress.totalRecords) * 100,
-                                )}
-                                className="h-1.5 bg-blue-100"
-                              />
-                            ) : null}
-                          </div>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  )
-                })}
-              </TableBody>
-            </Table>
-          </div>
+        <button
+          onClick={() => setActiveImportSection('official_gpkg')}
+          className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-2 ${
+            activeImportSection === 'official_gpkg'
+              ? 'border-blue-600 text-blue-800 bg-blue-50/50'
+              : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Globe2 className="w-4 h-4 text-blue-600" />
+          Repositório GPKG / KMZ (14 Arquivos)
+        </button>
+      </div>
 
-          <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-start gap-2">
-            <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <div>
-              <strong>Observação importante sobre pendências:</strong> O arquivo{' '}
-              <code>UTB_Ibiuna_500m_final.gpkg</code> citado pelo usuário não existe no repositório
-              GitHub oficial (foi utilizado o arquivo existente correspondente{' '}
-              <code>UTB_geometria_corrigida_FINAL.gpkg</code>). As 956 ocorrências históricas
-              continuam preservadas e não foram importadas, respeitando a autorização expressa do
-              usuário.
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* SEÇÃO IPT GEOJSON (FOCO DA TAREFA) */}
+      {activeImportSection === 'ipt_geojson' && (
+        <IptGeoJsonPanel
+          municipalityId={municipalityId}
+          userId={user?.id}
+          onImportComplete={loadBatches}
+        />
+      )}
 
-      {/* Upload Zone & Instructions */}
-      <Card className="border-slate-200 shadow-sm">
-        <CardHeader>
-          <CardTitle className="text-base flex items-center gap-2">
-            <Upload className="w-4 h-4 text-blue-600" />
-            Selecione a Planilha Técnica Oficial (.xlsx)
-          </CardTitle>
-          <CardDescription className="text-xs">
-            As linhas da planilha são processadas no seu navegador e gravadas com validação técnica
-            e histórico bruto para auditoria. Nenhuma linha é pré-embutida ou inventada.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-6 text-center bg-slate-50/50 hover:bg-blue-50/20 transition-all cursor-pointer relative">
-            <input
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileChange}
-              disabled={isParsing || isImporting}
-              className="absolute inset-0 opacity-0 cursor-pointer"
-            />
-            <div className="flex flex-col items-center justify-center gap-2">
-              <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
-                {isParsing ? (
-                  <RefreshCw className="w-6 h-6 animate-spin" />
-                ) : (
-                  <FileSpreadsheet className="w-6 h-6" />
-                )}
-              </div>
-              <div className="text-sm font-semibold text-slate-800">
-                {file ? file.name : 'Clique para selecionar o arquivo XLSX'}
-              </div>
-              <p className="text-xs text-slate-500 max-w-md">
-                Arquivo esperado:
-                `Sintese_Setores_Risco_Trechos_Perigo_2024_11_29_tabela_FINAL.xlsx` (esperado ~290
-                setores e ~202 trechos).
-              </p>
-            </div>
-          </div>
-
-          {/* Progress bar during import */}
-          {isImporting && (
-            <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-2">
-              <div className="flex justify-between text-xs font-semibold text-blue-900">
-                <span>{importStatusText}</span>
-                <span>{importProgress}%</span>
-              </div>
-              <Progress value={importProgress} className="h-2 bg-blue-200" />
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Painel de Qualidade e Resultados da Análise */}
-      {parseResult && (
-        <div className="space-y-6">
-          <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
-            <Card className="border-slate-200 bg-white">
-              <CardContent className="p-4">
-                <p className="text-xs font-medium text-slate-500">Linhas Brutas</p>
-                <p className="text-2xl font-bold text-slate-900 mt-1">{parseResult.totalRawRows}</p>
-                <p className="text-[10px] text-slate-400 mt-0.5">Aba principal</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 bg-blue-50/40 border-blue-200">
-              <CardContent className="p-4">
-                <p className="text-xs font-medium text-blue-700">Setores de Risco</p>
-                <p className="text-2xl font-bold text-blue-900 mt-1">
-                  {parseResult.totalRiskSectors}
-                </p>
-                <p className="text-[10px] text-blue-600 mt-0.5">Esperado: ~290</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 bg-amber-50/40 border-amber-200">
-              <CardContent className="p-4">
-                <p className="text-xs font-medium text-amber-700">Trechos Perigo</p>
-                <p className="text-2xl font-bold text-amber-900 mt-1">
-                  {parseResult.totalDangerStretches}
-                </p>
-                <p className="text-[10px] text-amber-600 mt-0.5">Esperado: ~202</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 bg-purple-50/40 border-purple-200">
-              <CardContent className="p-4">
-                <p className="text-xs font-medium text-purple-700">Totalizadores</p>
-                <p className="text-2xl font-bold text-purple-900 mt-1">
-                  {parseResult.totalTotalizers}
-                </p>
-                <p className="text-[10px] text-purple-600 mt-0.5">Isolados</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 bg-yellow-50/40 border-yellow-200">
-              <CardContent className="p-4">
-                <p className="text-xs font-medium text-yellow-700">Incompletos</p>
-                <p className="text-2xl font-bold text-yellow-900 mt-1">
-                  {parseResult.incompleteCount}
-                </p>
-                <p className="text-[10px] text-yellow-600 mt-0.5">Sem rejeição cega</p>
-              </CardContent>
-            </Card>
-
-            <Card className="border-slate-200 bg-emerald-50/40 border-emerald-200">
-              <CardContent className="p-4">
-                <p className="text-xs font-medium text-emerald-700">Registros Técnicos</p>
-                <p className="text-2xl font-bold text-emerald-900 mt-1">
-                  {parseResult.totalDataRecords}
-                </p>
-                <p className="text-[10px] text-emerald-600 mt-0.5 font-semibold">Esperado: ~492</p>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Action Bar */}
-          <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-slate-900 text-white rounded-xl gap-4">
-            <div className="space-y-1 text-center sm:text-left">
-              <div className="flex items-center gap-2 justify-center sm:justify-start">
-                <ShieldAlert className="w-5 h-5 text-amber-400" />
-                <span className="font-bold text-sm">Pronto para Gravação no Banco de Dados</span>
-              </div>
-              <p className="text-xs text-slate-300">
-                A gravação é idempotente (reexecutável a qualquer momento por código). Registros
-                receberão status Geometria: Ausente até envio de GeoJSON/Shapefile.
-              </p>
-            </div>
-
-            <Button
-              onClick={handleExecuteImport}
-              disabled={isImporting || importCompleted}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold w-full sm:w-auto shadow-md"
-            >
-              {isImporting ? (
-                <>
-                  <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  Importando...
-                </>
-              ) : importCompleted ? (
-                <>
-                  <CheckCircle2 className="w-4 h-4 mr-2 text-white" />
-                  Dados Importados
-                </>
-              ) : (
-                <>
-                  <Database className="w-4 h-4 mr-2" />
-                  Confirmar e Gravar {parseResult.totalDataRecords} Registros
-                </>
-              )}
-            </Button>
-          </div>
-
-          {/* Tabular Preview */}
-          <Card className="border-slate-200 shadow-sm">
-            <CardHeader className="p-4 pb-2">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                  <Layers className="w-4 h-4 text-blue-600" />
-                  Prévia dos Registros Técnicos Reconhecidos
+      {/* SEÇÃO GPKG OFICIAL */}
+      {activeImportSection === 'official_gpkg' && (
+        <Card className="border-blue-200 bg-gradient-to-b from-blue-50/50 to-white shadow-sm">
+          <CardHeader className="pb-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <CardTitle className="text-base flex items-center gap-2 text-blue-950 font-bold">
+                  <Globe2 className="w-5 h-5 text-blue-600" />
+                  Arquivos Geográficos Oficiais de Ibiúna (14 Arquivos GPKG / KMZ)
                 </CardTitle>
-                <Tabs value={filterTab} onValueChange={(v: any) => setFilterTab(v)}>
-                  <TabsList className="h-8">
-                    <TabsTrigger value="all" className="text-xs">
-                      Todos ({parseResult.validRecords.length})
-                    </TabsTrigger>
-                    <TabsTrigger value="sectors" className="text-xs">
-                      Setores ({parseResult.totalRiskSectors})
-                    </TabsTrigger>
-                    <TabsTrigger value="stretches" className="text-xs">
-                      Trechos ({parseResult.totalDangerStretches})
-                    </TabsTrigger>
-                    <TabsTrigger value="totalizers" className="text-xs">
-                      Totalizadores ({parseResult.totalTotalizers})
-                    </TabsTrigger>
-                    {parseResult.rejectedRecords.length > 0 && (
-                      <TabsTrigger value="rejected" className="text-xs text-red-600">
-                        Ignorados ({parseResult.rejectedRecords.length})
-                      </TabsTrigger>
-                    )}
-                  </TabsList>
-                </Tabs>
+                <CardDescription className="text-xs text-slate-600 mt-1">
+                  Importação em lote do repositório público oficial com conversão de EPSG:31983 para
+                  EPSG:4326, armazenamento em{' '}
+                  <code className="bg-slate-100 px-1 py-0.5 rounded text-blue-800">geo_layers</code>
+                  , conciliação e renderização no mapa.
+                </CardDescription>
               </div>
-            </CardHeader>
-            <CardContent className="p-0">
-              <div className="max-h-96 overflow-auto border-t border-slate-100">
-                <Table>
-                  <TableHeader className="bg-slate-50 sticky top-0">
-                    <TableRow className="text-[11px]">
-                      <TableHead className="w-12">Linha</TableHead>
-                      <TableHead>Tipo</TableHead>
-                      <TableHead>Código Oficial</TableHead>
-                      <TableHead>Área / Prancha</TableHead>
-                      <TableHead>Localização</TableHead>
-                      <TableHead>Processo</TableHead>
-                      <TableHead>Grau de Risco</TableHead>
-                      <TableHead>Edificações / Vias</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody className="text-xs">
-                    {filterTab === 'rejected'
-                      ? parseResult.rejectedRecords.map((rej, idx) => (
-                          <TableRow key={`rej-${idx}`} className="bg-red-50/40">
-                            <TableCell className="font-mono text-[11px]">{rej.line}</TableCell>
-                            <TableCell colSpan={7} className="text-red-700">
-                              {rej.reason}
-                            </TableCell>
-                            <TableCell>
-                              <Badge variant="destructive" className="text-[10px]">
-                                Rejeitado
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                      : filteredRecords()
-                          .slice(0, 100)
-                          .map((r, idx) => (
-                            <TableRow key={`row-${idx}`} className="hover:bg-slate-50">
-                              <TableCell className="font-mono text-[11px] text-slate-500">
-                                {r.sourceLineNumber}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    r.kind === 'sector'
-                                      ? 'bg-blue-50 text-blue-700 border-blue-200'
-                                      : r.kind === 'stretch'
-                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
-                                        : 'bg-purple-50 text-purple-700 border-purple-200'
-                                  }
-                                >
-                                  {r.kind === 'sector'
-                                    ? 'Setor'
-                                    : r.kind === 'stretch'
-                                      ? 'Trecho'
-                                      : 'Total'}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="font-semibold text-slate-900 font-mono text-[11px]">
-                                {r.code}
-                              </TableCell>
-                              <TableCell className="max-w-[160px] truncate" title={r.areaName}>
-                                {r.areaName || '-'}
-                              </TableCell>
-                              <TableCell className="max-w-[180px] truncate" title={r.location}>
-                                {r.location || '-'}
-                              </TableCell>
-                              <TableCell>{r.processType || '-'}</TableCell>
-                              <TableCell>
-                                <span
-                                  className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
-                                    r.riskLevel === 'R4'
-                                      ? 'bg-red-600 text-white'
-                                      : r.riskLevel === 'R3'
-                                        ? 'bg-orange-500 text-white'
-                                        : r.riskLevel === 'R2'
-                                          ? 'bg-amber-400 text-slate-900'
-                                          : 'bg-emerald-500 text-white'
-                                  }`}
-                                >
-                                  {r.riskGrade || r.riskLevel}
+
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleImportOfficialGeoFiles(true)}
+                  disabled={isOfficialGeoImporting}
+                  className="bg-white hover:bg-blue-50 border-blue-200 text-blue-700 text-xs font-semibold"
+                >
+                  <Layers className="w-3.5 h-3.5 mr-1" />
+                  Importar 4 Camadas Prioritárias
+                </Button>
+                <Button
+                  size="sm"
+                  onClick={() => handleImportOfficialGeoFiles(false)}
+                  disabled={isOfficialGeoImporting}
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-sm"
+                >
+                  {isOfficialGeoImporting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 mr-1 animate-spin" />
+                      Processando...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-3.5 h-3.5 mr-1" />
+                      Importar Todos os 14 Arquivos
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+
+          <CardContent className="space-y-4">
+            <div className="border border-slate-200 rounded-lg overflow-hidden bg-white">
+              <Table>
+                <TableHeader className="bg-slate-50 text-[11px]">
+                  <TableRow>
+                    <TableHead>Arquivo</TableHead>
+                    <TableHead>Finalidade / Descrição</TableHead>
+                    <TableHead className="w-24">Tamanho</TableHead>
+                    <TableHead className="w-28">Prioridade</TableHead>
+                    <TableHead className="w-48">Status / Progresso</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="text-xs">
+                  {OFFICIAL_GEO_FILES.map((f) => {
+                    const progress = officialGeoProgressList[f.id]
+                    return (
+                      <TableRow key={f.id} className="hover:bg-slate-50/70">
+                        <TableCell className="font-semibold text-slate-900 font-mono text-[11px]">
+                          {f.filename}
+                        </TableCell>
+                        <TableCell className="text-slate-600 text-xs">{f.description}</TableCell>
+                        <TableCell className="text-slate-500 font-mono text-[11px]">
+                          {f.sizeApprox}
+                        </TableCell>
+                        <TableCell>
+                          {f.isPriority ? (
+                            <Badge className="bg-amber-500 text-white text-[10px]">
+                              Prioritária
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-slate-500 text-[10px]">
+                              Contexto
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {!progress ? (
+                            <span className="text-slate-400 text-[11px]">Pronto para carga</span>
+                          ) : progress.status === 'completed' ? (
+                            <div className="flex items-center gap-1.5 text-emerald-600 font-semibold text-[11px]">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>{progress.importedCount || 0} feições gravadas</span>
+                            </div>
+                          ) : progress.status === 'error' ? (
+                            <div className="flex items-center gap-1 text-red-600 text-[11px]">
+                              <XCircle className="w-3.5 h-3.5" />
+                              <span className="truncate max-w-[140px]" title={progress.error}>
+                                {progress.error}
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5 text-blue-600 text-[11px]">
+                                <RefreshCw className="w-3 h-3 animate-spin" />
+                                <span className="truncate max-w-[140px]">
+                                  {progress.currentStep}
                                 </span>
-                              </TableCell>
-                              <TableCell>
-                                {r.affectedBuildings !== undefined
-                                  ? `${r.affectedBuildings} edif.`
-                                  : r.affectedRoadsLength !== undefined
-                                    ? `${r.affectedRoadsLength} m`
-                                    : '-'}
-                              </TableCell>
-                              <TableCell>
-                                <Badge
-                                  variant="outline"
-                                  className={
-                                    r.isIncomplete
-                                      ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
-                                      : 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                                  }
-                                >
-                                  {r.isIncomplete ? 'Incompleto' : 'Válido'}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                  </TableBody>
-                </Table>
+                              </div>
+                              {progress.totalRecords && progress.importedCount ? (
+                                <Progress
+                                  value={Math.round(
+                                    (progress.importedCount / progress.totalRecords) * 100,
+                                  )}
+                                  className="h-1.5 bg-blue-100"
+                                />
+                              ) : null}
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+
+            <div className="p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-800 flex items-start gap-2">
+              <Info className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <strong>Observação importante sobre pendências:</strong> O arquivo{' '}
+                <code>UTB_Ibiuna_500m_final.gpkg</code> citado pelo usuário não existe no
+                repositório GitHub oficial (foi utilizado o arquivo existente correspondente{' '}
+                <code>UTB_geometria_corrigida_FINAL.gpkg</code>). As 956 ocorrências históricas
+                continuam preservadas e não foram importadas, respeitando a autorização expressa do
+                usuário.
               </div>
-              <div className="p-2 px-4 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 flex justify-between">
-                <span>Exibindo os primeiros 100 registros para visualização rápida.</span>
-                <span>Total no arquivo: {parseResult.validRecords.length} válidos</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* SEÇÃO PLANILHA XLSX */}
+      {activeImportSection === 'xlsx' && (
+        <>
+          <Card className="border-slate-200 shadow-sm">
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <Upload className="w-4 h-4 text-blue-600" />
+                Selecione a Planilha Técnica Oficial (.xlsx)
+              </CardTitle>
+              <CardDescription className="text-xs">
+                As linhas da planilha são processadas no seu navegador e gravadas com validação
+                técnica e histórico bruto para auditoria. Nenhuma linha é pré-embutida ou inventada.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-xl p-6 text-center bg-slate-50/50 hover:bg-blue-50/20 transition-all cursor-pointer relative">
+                <input
+                  type="file"
+                  accept=".xlsx,.xls"
+                  onChange={handleFileChange}
+                  disabled={isParsing || isImporting}
+                  className="absolute inset-0 opacity-0 cursor-pointer"
+                />
+                <div className="flex flex-col items-center justify-center gap-2">
+                  <div className="w-12 h-12 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center">
+                    {isParsing ? (
+                      <RefreshCw className="w-6 h-6 animate-spin" />
+                    ) : (
+                      <FileSpreadsheet className="w-6 h-6" />
+                    )}
+                  </div>
+                  <div className="text-sm font-semibold text-slate-800">
+                    {file ? file.name : 'Clique para selecionar o arquivo XLSX'}
+                  </div>
+                  <p className="text-xs text-slate-500 max-w-md">
+                    Arquivo esperado:
+                    `Sintese_Setores_Risco_Trechos_Perigo_2024_11_29_tabela_FINAL.xlsx` (esperado
+                    ~290 setores e ~202 trechos).
+                  </p>
+                </div>
               </div>
+
+              {/* Progress bar during import */}
+              {isImporting && (
+                <div className="p-4 bg-blue-50 rounded-lg border border-blue-200 space-y-2">
+                  <div className="flex justify-between text-xs font-semibold text-blue-900">
+                    <span>{importStatusText}</span>
+                    <span>{importProgress}%</span>
+                  </div>
+                  <Progress value={importProgress} className="h-2 bg-blue-200" />
+                </div>
+              )}
             </CardContent>
           </Card>
-        </div>
+
+          {/* Painel de Qualidade e Resultados da Análise */}
+          {parseResult && (
+            <div className="space-y-6">
+              <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+                <Card className="border-slate-200 bg-white">
+                  <CardContent className="p-4">
+                    <p className="text-xs font-medium text-slate-500">Linhas Brutas</p>
+                    <p className="text-2xl font-bold text-slate-900 mt-1">
+                      {parseResult.totalRawRows}
+                    </p>
+                    <p className="text-[10px] text-slate-400 mt-0.5">Aba principal</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 bg-blue-50/40 border-blue-200">
+                  <CardContent className="p-4">
+                    <p className="text-xs font-medium text-blue-700">Setores de Risco</p>
+                    <p className="text-2xl font-bold text-blue-900 mt-1">
+                      {parseResult.totalRiskSectors}
+                    </p>
+                    <p className="text-[10px] text-blue-600 mt-0.5">Esperado: ~290</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 bg-amber-50/40 border-amber-200">
+                  <CardContent className="p-4">
+                    <p className="text-xs font-medium text-amber-700">Trechos Perigo</p>
+                    <p className="text-2xl font-bold text-amber-900 mt-1">
+                      {parseResult.totalDangerStretches}
+                    </p>
+                    <p className="text-[10px] text-amber-600 mt-0.5">Esperado: ~202</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 bg-purple-50/40 border-purple-200">
+                  <CardContent className="p-4">
+                    <p className="text-xs font-medium text-purple-700">Totalizadores</p>
+                    <p className="text-2xl font-bold text-purple-900 mt-1">
+                      {parseResult.totalTotalizers}
+                    </p>
+                    <p className="text-[10px] text-purple-600 mt-0.5">Isolados</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 bg-yellow-50/40 border-yellow-200">
+                  <CardContent className="p-4">
+                    <p className="text-xs font-medium text-yellow-700">Incompletos</p>
+                    <p className="text-2xl font-bold text-yellow-900 mt-1">
+                      {parseResult.incompleteCount}
+                    </p>
+                    <p className="text-[10px] text-yellow-600 mt-0.5">Sem rejeição cega</p>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-slate-200 bg-emerald-50/40 border-emerald-200">
+                  <CardContent className="p-4">
+                    <p className="text-xs font-medium text-emerald-700">Registros Técnicos</p>
+                    <p className="text-2xl font-bold text-emerald-900 mt-1">
+                      {parseResult.totalDataRecords}
+                    </p>
+                    <p className="text-[10px] text-emerald-600 mt-0.5 font-semibold">
+                      Esperado: ~492
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Action Bar */}
+              <div className="flex flex-col sm:flex-row items-center justify-between p-4 bg-slate-900 text-white rounded-xl gap-4">
+                <div className="space-y-1 text-center sm:text-left">
+                  <div className="flex items-center gap-2 justify-center sm:justify-start">
+                    <ShieldAlert className="w-5 h-5 text-amber-400" />
+                    <span className="font-bold text-sm">
+                      Pronto para Gravação no Banco de Dados
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300">
+                    A gravação é idempotente (reexecutável a qualquer momento por código). Registros
+                    receberão status Geometria: Ausente até envio de GeoJSON/Shapefile.
+                  </p>
+                </div>
+
+                <Button
+                  onClick={handleExecuteImport}
+                  disabled={isImporting || importCompleted}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold w-full sm:w-auto shadow-md"
+                >
+                  {isImporting ? (
+                    <>
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                      Importando...
+                    </>
+                  ) : importCompleted ? (
+                    <>
+                      <CheckCircle2 className="w-4 h-4 mr-2 text-white" />
+                      Dados Importados
+                    </>
+                  ) : (
+                    <>
+                      <Database className="w-4 h-4 mr-2" />
+                      Confirmar e Gravar {parseResult.totalDataRecords} Registros
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* Tabular Preview */}
+              <Card className="border-slate-200 shadow-sm">
+                <CardHeader className="p-4 pb-2">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <CardTitle className="text-sm font-bold text-slate-800 flex items-center gap-2">
+                      <Layers className="w-4 h-4 text-blue-600" />
+                      Prévia dos Registros Técnicos Reconhecidos
+                    </CardTitle>
+                    <Tabs value={filterTab} onValueChange={(v: any) => setFilterTab(v)}>
+                      <TabsList className="h-8">
+                        <TabsTrigger value="all" className="text-xs">
+                          Todos ({parseResult.validRecords.length})
+                        </TabsTrigger>
+                        <TabsTrigger value="sectors" className="text-xs">
+                          Setores ({parseResult.totalRiskSectors})
+                        </TabsTrigger>
+                        <TabsTrigger value="stretches" className="text-xs">
+                          Trechos ({parseResult.totalDangerStretches})
+                        </TabsTrigger>
+                        <TabsTrigger value="totalizers" className="text-xs">
+                          Totalizadores ({parseResult.totalTotalizers})
+                        </TabsTrigger>
+                        {parseResult.rejectedRecords.length > 0 && (
+                          <TabsTrigger value="rejected" className="text-xs text-red-600">
+                            Ignorados ({parseResult.rejectedRecords.length})
+                          </TabsTrigger>
+                        )}
+                      </TabsList>
+                    </Tabs>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="max-h-96 overflow-auto border-t border-slate-100">
+                    <Table>
+                      <TableHeader className="bg-slate-50 sticky top-0">
+                        <TableRow className="text-[11px]">
+                          <TableHead className="w-12">Linha</TableHead>
+                          <TableHead>Tipo</TableHead>
+                          <TableHead>Código Oficial</TableHead>
+                          <TableHead>Área / Prancha</TableHead>
+                          <TableHead>Localização</TableHead>
+                          <TableHead>Processo</TableHead>
+                          <TableHead>Grau de Risco</TableHead>
+                          <TableHead>Edificações / Vias</TableHead>
+                          <TableHead>Status</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody className="text-xs">
+                        {filterTab === 'rejected'
+                          ? parseResult.rejectedRecords.map((rej, idx) => (
+                              <TableRow key={`rej-${idx}`} className="bg-red-50/40">
+                                <TableCell className="font-mono text-[11px]">{rej.line}</TableCell>
+                                <TableCell colSpan={7} className="text-red-700">
+                                  {rej.reason}
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant="destructive" className="text-[10px]">
+                                    Rejeitado
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          : filteredRecords()
+                              .slice(0, 100)
+                              .map((r, idx) => (
+                                <TableRow key={`row-${idx}`} className="hover:bg-slate-50">
+                                  <TableCell className="font-mono text-[11px] text-slate-500">
+                                    {r.sourceLineNumber}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        r.kind === 'sector'
+                                          ? 'bg-blue-50 text-blue-700 border-blue-200'
+                                          : r.kind === 'stretch'
+                                            ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                            : 'bg-purple-50 text-purple-700 border-purple-200'
+                                      }
+                                    >
+                                      {r.kind === 'sector'
+                                        ? 'Setor'
+                                        : r.kind === 'stretch'
+                                          ? 'Trecho'
+                                          : 'Total'}
+                                    </Badge>
+                                  </TableCell>
+                                  <TableCell className="font-semibold text-slate-900 font-mono text-[11px]">
+                                    {r.code}
+                                  </TableCell>
+                                  <TableCell className="max-w-[160px] truncate" title={r.areaName}>
+                                    {r.areaName || '-'}
+                                  </TableCell>
+                                  <TableCell className="max-w-[180px] truncate" title={r.location}>
+                                    {r.location || '-'}
+                                  </TableCell>
+                                  <TableCell>{r.processType || '-'}</TableCell>
+                                  <TableCell>
+                                    <span
+                                      className={`px-1.5 py-0.5 rounded text-[11px] font-bold ${
+                                        r.riskLevel === 'R4'
+                                          ? 'bg-red-600 text-white'
+                                          : r.riskLevel === 'R3'
+                                            ? 'bg-orange-500 text-white'
+                                            : r.riskLevel === 'R2'
+                                              ? 'bg-amber-400 text-slate-900'
+                                              : 'bg-emerald-500 text-white'
+                                      }`}
+                                    >
+                                      {r.riskGrade || r.riskLevel}
+                                    </span>
+                                  </TableCell>
+                                  <TableCell>
+                                    {r.affectedBuildings !== undefined
+                                      ? `${r.affectedBuildings} edif.`
+                                      : r.affectedRoadsLength !== undefined
+                                        ? `${r.affectedRoadsLength} m`
+                                        : '-'}
+                                  </TableCell>
+                                  <TableCell>
+                                    <Badge
+                                      variant="outline"
+                                      className={
+                                        r.isIncomplete
+                                          ? 'bg-yellow-50 text-yellow-700 border-yellow-200'
+                                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                                      }
+                                    >
+                                      {r.isIncomplete ? 'Incompleto' : 'Válido'}
+                                    </Badge>
+                                  </TableCell>
+                                </TableRow>
+                              ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="p-2 px-4 bg-slate-50 border-t border-slate-100 text-[11px] text-slate-500 flex justify-between">
+                    <span>Exibindo os primeiros 100 registros para visualização rápida.</span>
+                    <span>Total no arquivo: {parseResult.validRecords.length} válidos</span>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </>
       )}
 
       {/* Histórico de Lotes Gravados */}

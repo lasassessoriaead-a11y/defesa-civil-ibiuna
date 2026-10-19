@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-10-19T14:30:00Z",
+  "version": "0.0.26",
+  "description": "Backup de salvaguarda antes da integração do GeoJSON IPT (Setores e Trechos)",
+  "state": {
+    "occurrences_count": 3,
+    "occurrence_counters_current_number": 3,
+    "document_counters_aut": 101,
+    "risk_sectors_count": 290,
+    "danger_stretches_count": 203,
+    "strategic_infrastructures_count": 215,
+    "users_count": 2,
+    "municipalities_count": 2
+  }
+}

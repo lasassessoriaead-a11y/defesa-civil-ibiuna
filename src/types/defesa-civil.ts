@@ -172,7 +172,7 @@ export interface Occurrence extends RecordModel {
 // ---------------------------------------------
 export type RiskGradeLevel = 'R1' | 'R2' | 'R3' | 'R4' | 'indefinido'
 export type ValidationStatus = 'aprovado' | 'pendente_conferencia' | 'rejeitado' | 'incompleto'
-export type GeometryStatus = 'ausente' | 'pendente' | 'validada' | 'invalida'
+export type GeometryStatus = 'ausente' | 'pendente' | 'validada' | 'invalida' | 'vinculada'
 
 export interface RiskSector extends RecordModel {
   municipality: string
