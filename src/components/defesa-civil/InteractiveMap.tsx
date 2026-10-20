@@ -31,6 +31,10 @@ import {
   Globe,
   ExternalLink,
   Download,
+  Search,
+  X,
+  Loader2,
+  Crosshair,
 } from 'lucide-react'
 import { getGoogleEarthUrl, generateKmlDocument, downloadKmlFile } from '@/lib/kml-export'
 import { Button } from '@/components/ui/button'
@@ -45,6 +49,11 @@ import type {
   StrategicInfrastructure,
 } from '@/types/defesa-civil'
 import { SeverityBadge, getHazardIcon } from './StatusBadges'
+import {
+  forwardGeocode,
+  parseCoordinateInput,
+  type DirectGeocodeResult,
+} from '@/services/geocoding'
 
 // Cache em memória compartilhado entre montagens do InteractiveMap
 // Evita re-buscar geo_layers, risk_sectors e danger_stretches repetidamente
@@ -138,6 +147,19 @@ function getPickedPinIcon() {
     </div>
   `
   return createDivIcon(html, '', [32, 42], [16, 40])
+}
+
+// Search Location Pin Icon (Blue/Cyan pulse for geocoded address or coordinates)
+function getSearchLocationPinIcon() {
+  const html = `
+    <div class="relative -translate-y-2 flex flex-col items-center">
+      <div class="w-9 h-9 rounded-full bg-blue-600 border-2 border-white shadow-2xl flex items-center justify-center text-white ring-4 ring-blue-500/30 animate-bounce">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+      </div>
+      <div class="w-2.5 h-2 bg-blue-900 rounded-full blur-[1px] -mt-0.5"></div>
+    </div>
+  `
+  return createDivIcon(html, '', [36, 44], [18, 42])
 }
 
 // Color and stroke settings for risk areas
@@ -509,16 +531,153 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     lng: -47.22,
   })
 
-  // Fecha menu de contexto com tecla Escape ou clique fora
+  // Estado da Busca de Endereço / Coordenadas no Mapa (Nominatim + Parser Decimal)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [searchResults, setSearchResults] = useState<DirectGeocodeResult[]>([])
+  const [searchError, setSearchError] = useState<string | null>(null)
+  const [searchActiveResult, setSearchActiveResult] = useState<{
+    lat: number
+    lng: number
+    displayName: string
+    isCoordinate?: boolean
+    warning?: string
+  } | null>(null)
+  const searchAbortControllerRef = useRef<AbortController | null>(null)
+  const searchDebounceTimerRef = useRef<any>(null)
+  const searchContainerRef = useRef<HTMLDivElement>(null)
+
+  // Fecha menu de contexto e dropdown de busca com tecla Escape ou clique fora
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
         setContextMenu(null)
+        setSearchResults([])
+      }
+    }
+    const handleClickOutside = (e: MouseEvent) => {
+      if (searchContainerRef.current && !searchContainerRef.current.contains(e.target as Node)) {
+        setSearchResults([])
       }
     }
     window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown)
+      document.removeEventListener('mousedown', handleClickOutside)
+    }
   }, [])
+
+  // Limpeza de timers e requisições pendentes na desmontagem
+  useEffect(() => {
+    return () => {
+      if (searchDebounceTimerRef.current) {
+        clearTimeout(searchDebounceTimerRef.current)
+      }
+      if (searchAbortControllerRef.current) {
+        searchAbortControllerRef.current.abort()
+      }
+    }
+  }, [])
+
+  // Executa busca com debounce estrito de 1000ms para cumprir a política do Nominatim
+  const handleSearchInputChange = (text: string) => {
+    setSearchQuery(text)
+    setSearchError(null)
+
+    if (searchDebounceTimerRef.current) {
+      clearTimeout(searchDebounceTimerRef.current)
+    }
+    if (searchAbortControllerRef.current) {
+      searchAbortControllerRef.current.abort()
+      searchAbortControllerRef.current = null
+    }
+
+    const trimmed = text.trim()
+    if (!trimmed) {
+      setSearchResults([])
+      setSearchLoading(false)
+      return
+    }
+
+    // Se for coordenada decimal direta, analisa imediatamente sem esperar 1s e sem fazer requisição de rede
+    const directCoord = parseCoordinateInput(trimmed)
+    if (directCoord) {
+      setSearchLoading(false)
+      setSearchResults([
+        {
+          latitude: directCoord.latitude,
+          longitude: directCoord.longitude,
+          displayName: `Coordenadas: ${directCoord.formatted}`,
+          isCoordinate: true,
+          warning: directCoord.warning,
+        },
+      ])
+      return
+    }
+
+    // Se tiver menos de 3 caracteres textuais, não dispara requisição ao Nominatim
+    if (trimmed.length < 3) {
+      setSearchResults([])
+      setSearchLoading(false)
+      return
+    }
+
+    // Debounce de 1000ms conforme a política de uso do Nominatim OSM
+    setSearchLoading(true)
+    searchDebounceTimerRef.current = setTimeout(async () => {
+      const controller = new AbortController()
+      searchAbortControllerRef.current = controller
+
+      try {
+        const results = await forwardGeocode(trimmed, 'Ibiúna', 5, controller.signal)
+        setSearchResults(results)
+        if (results.length === 0) {
+          setSearchError('Nenhum endereço encontrado para esta busca.')
+        }
+      } catch (err: any) {
+        if (err?.name === 'AbortError') return
+        console.warn('[InteractiveMap] Erro na busca de endereço:', err)
+        setSearchError(err?.message || 'Falha ao buscar endereço. Verifique sua conexão de rede.')
+        setSearchResults([])
+      } finally {
+        setSearchLoading(false)
+      }
+    }, 1000)
+  }
+
+  // Seleciona um resultado da busca: centraliza mapa com zoom 17 e posiciona marcador temporário
+  const handleSelectSearchResult = (result: DirectGeocodeResult) => {
+    const lat = result.latitude
+    const lng = result.longitude
+    setMapCenter([lat, lng])
+    setCurrentZoom(17)
+    setSearchActiveResult({
+      lat,
+      lng,
+      displayName: result.displayName,
+      isCoordinate: result.isCoordinate,
+      warning: result.warning,
+    })
+    setSearchResults([])
+    // Notifica também callback de viewport se fornecido
+    onViewportChange?.([lat, lng], 17)
+  }
+
+  // Limpa busca e marcador temporário
+  const handleClearSearch = () => {
+    setSearchQuery('')
+    setSearchResults([])
+    setSearchError(null)
+    setSearchActiveResult(null)
+    if (searchDebounceTimerRef.current) {
+      clearTimeout(searchDebounceTimerRef.current)
+    }
+    if (searchAbortControllerRef.current) {
+      searchAbortControllerRef.current.abort()
+    }
+  }
 
   const handleBaseMapChange = (mode: 'map' | 'satellite' | 'hybrid') => {
     setBaseMapMode(mode)
@@ -706,20 +865,21 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       navigate(`/setores-risco?id=${encodeURIComponent(targetId)}`)
     }
   }
-  // Validate initial center
+  // Validate initial center and dynamic map center
   const validCenter: [number, number] = useMemo(() => {
+    const target = mapCenter || center
     if (
-      Array.isArray(center) &&
-      center.length === 2 &&
-      typeof center[0] === 'number' &&
-      !isNaN(center[0]) &&
-      typeof center[1] === 'number' &&
-      !isNaN(center[1])
+      Array.isArray(target) &&
+      target.length === 2 &&
+      typeof target[0] === 'number' &&
+      !isNaN(target[0]) &&
+      typeof target[1] === 'number' &&
+      !isNaN(target[1])
     ) {
-      return center
+      return target
     }
     return [-23.5505, -46.6333]
-  }, [center])
+  }, [mapCenter, center])
 
   const handleExportKml = () => {
     const kml = generateKmlDocument({
@@ -738,7 +898,7 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
     >
       {/* Barra superior de controles sobre o mapa: layout em fluxo flex-col com gap, impedindo qualquer sobreposição entre base e chips */}
       <div className="absolute top-2 left-2 right-12 z-[400] flex flex-col items-start gap-1.5 pointer-events-none">
-        {/* Linha 1: Controles de Base (Mapa | Satélite | Híbrido) e Integrações (Google Earth / KML) */}
+        {/* Linha 1: Controles de Base (Mapa | Satélite | Híbrido), Integrações e Busca de Endereço/Coordenadas */}
         <div className="flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md p-1 rounded-lg border border-slate-300 shadow-md pointer-events-auto max-w-full">
           {/* Seletor de Base de Visualização */}
           <div className="flex items-center rounded-md bg-slate-100 p-0.5 border border-slate-200">
@@ -777,6 +937,29 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </button>
           </div>
 
+          {/* Botão de Busca de Endereço / Coordenadas (expandível) */}
+          <div className="flex items-center border-l border-slate-200 pl-1.5">
+            <Button
+              size="sm"
+              variant={searchOpen || searchActiveResult ? 'default' : 'outline'}
+              onClick={() => {
+                setSearchOpen((prev) => !prev)
+              }}
+              className={`h-6 px-2 text-[11px] font-medium flex items-center gap-1 transition-all ${
+                searchOpen || searchActiveResult
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600'
+                  : 'text-slate-700 bg-white hover:bg-slate-50 border-slate-300'
+              }`}
+              title="Buscar endereço ou coordenadas no mapa (OpenStreetMap / Nominatim)"
+            >
+              <Search className="w-3 h-3 shrink-0" />
+              <span>Localizar Endereço</span>
+              {searchActiveResult && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />
+              )}
+            </Button>
+          </div>
+
           {/* Integração Google Earth KML */}
           <div className="flex items-center gap-1 border-l border-slate-200 pl-1.5">
             <Button
@@ -804,6 +987,124 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             </a>
           </div>
         </div>
+
+        {/* Linha Dedicada para Campo de Busca de Endereço / Coordenadas quando aberto ou com ponto ativo */}
+        {(searchOpen || searchActiveResult) && (
+          <div
+            ref={searchContainerRef}
+            className="relative pointer-events-auto w-full max-w-md bg-white/95 backdrop-blur-md p-1.5 rounded-lg border border-blue-200 shadow-lg text-xs animate-in fade-in slide-in-from-top-1 duration-150"
+          >
+            <div className="flex items-center gap-1.5">
+              <div className="relative flex-1 flex items-center">
+                <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 pointer-events-none" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => handleSearchInputChange(e.target.value)}
+                  placeholder="Ex: Ciro Conceição Vieira de Pontes ou -23.78428, -47.22237"
+                  className="w-full h-7 pl-8 pr-7 bg-slate-50 hover:bg-white focus:bg-white border border-slate-300 focus:border-blue-500 rounded text-xs text-slate-800 placeholder:text-slate-400 outline-hidden transition-all"
+                  autoFocus
+                />
+                {searchLoading ? (
+                  <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin absolute right-2" />
+                ) : searchQuery ? (
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="p-1 hover:bg-slate-200 rounded text-slate-400 hover:text-slate-700 absolute right-1 transition-colors"
+                    title="Limpar busca"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                ) : null}
+              </div>
+
+              {searchActiveResult && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={handleClearSearch}
+                  className="h-7 px-2 text-[11px] text-red-600 hover:bg-red-50 hover:text-red-700"
+                  title="Remover ponto de busca do mapa"
+                >
+                  <Trash2 className="w-3 h-3 mr-1" />
+                  <span>Limpar ponto</span>
+                </Button>
+              )}
+
+              <button
+                type="button"
+                onClick={() => setSearchOpen(false)}
+                className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded"
+                title="Minimizar campo de busca"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+
+            {/* Aviso de erro ou sem resultados */}
+            {searchError && (
+              <div className="mt-1.5 px-2 py-1 bg-amber-50 border border-amber-200 rounded text-[11px] text-amber-800">
+                {searchError}
+              </div>
+            )}
+
+            {/* Sugestões / Resultados da Busca Dropdown */}
+            {searchResults.length > 0 && (
+              <div className="mt-1.5 max-h-52 overflow-y-auto divide-y divide-slate-100 border border-slate-200 rounded-md bg-white shadow-md">
+                {searchResults.map((item, idx) => (
+                  <button
+                    key={`${item.latitude}-${item.longitude}-${idx}`}
+                    type="button"
+                    onClick={() => handleSelectSearchResult(item)}
+                    className="w-full text-left p-2 hover:bg-blue-50/80 transition-colors flex items-start gap-2 group"
+                  >
+                    {item.isCoordinate ? (
+                      <Crosshair className="w-4 h-4 text-emerald-600 mt-0.5 shrink-0" />
+                    ) : (
+                      <MapPin className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold text-slate-900 group-hover:text-blue-900 truncate">
+                        {item.isCoordinate
+                          ? item.displayName
+                          : item.address?.road || item.displayName.split(',')[0]}
+                      </div>
+                      <div className="text-[10px] text-slate-500 line-clamp-2 mt-0.5">
+                        {item.displayName}
+                      </div>
+                      {item.warning && (
+                        <div className="text-[10px] text-amber-600 font-medium mt-0.5">
+                          ⚠️ {item.warning}
+                        </div>
+                      )}
+                      <div className="text-[9px] font-mono text-slate-400 mt-0.5">
+                        {item.latitude.toFixed(5)}, {item.longitude.toFixed(5)}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Ponto atualmente fixado e localizado */}
+            {searchActiveResult && !searchResults.length && (
+              <div className="mt-1.5 px-2 py-1 bg-blue-50/80 border border-blue-200 rounded flex items-center justify-between text-[11px] text-blue-900">
+                <div className="flex items-center gap-1.5 truncate">
+                  <MapPin className="w-3.5 h-3.5 text-blue-600 shrink-0" />
+                  <span className="font-semibold truncate">
+                    {searchActiveResult.isCoordinate
+                      ? 'Ponto por Coordenadas'
+                      : searchActiveResult.displayName.split(',')[0]}
+                  </span>
+                  <span className="font-mono text-[10px] text-blue-700 shrink-0">
+                    ({searchActiveResult.lat.toFixed(5)}, {searchActiveResult.lng.toFixed(5)})
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Linha 2: Chips de Camadas e Filtros Integrados (Ocorrências, Pontes/Aduelas, IPT, etc) organizados com flex-wrap sem sobreposição */}
         {showLayerToggles && (
@@ -2015,6 +2316,69 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
               icon={getPickedPinIcon()}
             />
           )}
+
+        {/* Render Marcador Temporário de Busca de Endereço / Coordenadas */}
+        {searchActiveResult && (
+          <Marker
+            position={[searchActiveResult.lat, searchActiveResult.lng]}
+            icon={getSearchLocationPinIcon()}
+          >
+            <Tooltip permanent direction="top" offset={[0, -28]}>
+              <div className="font-semibold text-xs text-blue-950 flex items-center gap-1">
+                <MapPin className="w-3.5 h-3.5 text-blue-600" />
+                <span>
+                  {searchActiveResult.isCoordinate
+                    ? 'Ponto Localizado'
+                    : searchActiveResult.displayName.split(',')[0]}
+                </span>
+              </div>
+            </Tooltip>
+            <Popup>
+              <div className="p-1 min-w-[220px] max-w-[280px] text-xs space-y-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-blue-900 border-b pb-1">
+                  <MapPin className="w-4 h-4 text-blue-600 shrink-0" />
+                  <span className="truncate">Localizado pela Busca</span>
+                </div>
+                <div className="text-slate-700 text-xs leading-relaxed">
+                  {searchActiveResult.displayName}
+                </div>
+                {searchActiveResult.warning && (
+                  <div className="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 p-1 rounded">
+                    ⚠️ {searchActiveResult.warning}
+                  </div>
+                )}
+                <div className="text-[10px] font-mono text-slate-500 pt-0.5">
+                  Lat: {searchActiveResult.lat.toFixed(6)} | Lng:{' '}
+                  {searchActiveResult.lng.toFixed(6)}
+                </div>
+                <div className="pt-1.5 border-t flex flex-col gap-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetCoord = {
+                        lat: searchActiveResult.lat,
+                        lng: searchActiveResult.lng,
+                      }
+                      setQuickRegisterCoord(targetCoord)
+                      setQuickRegisterMode('occurrence')
+                      setQuickRegisterOpen(true)
+                    }}
+                    className="w-full text-center px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[11px] font-semibold transition-colors"
+                  >
+                    Registrar Ocorrência Aqui
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClearSearch}
+                    className="w-full text-center px-2 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded text-[11px] font-medium transition-colors"
+                  >
+                    Remover Marcador
+                  </button>
+                </div>
+              </div>
+            </Popup>
+          </Marker>
+        )}
       </MapContainer>
 
       {/* Legenda Oficial Completa de Camadas */}

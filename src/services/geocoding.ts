@@ -23,6 +23,130 @@ export interface DirectGeocodeResult {
   latitude: number
   longitude: number
   displayName: string
+  address?: {
+    road?: string
+    suburb?: string
+    city?: string
+    town?: string
+    state?: string
+    postcode?: string
+  }
+  isCoordinate?: boolean
+  warning?: string
+}
+
+export interface ParsedCoordinateResult {
+  latitude: number
+  longitude: number
+  isPlausibleBrazil: boolean
+  isWithinIbiuna: boolean
+  swappedOrder?: boolean
+  formatted: string
+  warning?: string
+}
+
+/**
+ * Analisa e extrai coordenadas decimais a partir de texto colado ou digitado.
+ * Suporta:
+ * - "-23.78428, -47.22237"
+ * - "-23.78428 -47.22237"
+ * - "−23.78428, −47.22237" (com travessão unicode)
+ * - "-23,78428; -47,22237" (vírgula como separador decimal)
+ * - Detecção inteligente de ordem invertida (lng, lat) baseado em limites do Brasil/Ibiúna
+ */
+export function parseCoordinateInput(rawInput: string): ParsedCoordinateResult | null {
+  if (!rawInput || !rawInput.trim()) return null
+
+  // Normalizar travessões e hifens unicode (−, –, —) para hífen ASCII '-'
+  const normalized = rawInput.trim().replace(/[\u2212\u2013\u2014]/g, '-')
+
+  // Detecta se parece uma entrada de coordenadas antes de prosseguir
+  // Precisa ter números e preferencialmente sinal ou separador
+  if (!/[0-9]/.test(normalized)) return null
+
+  // Substitui separadores comuns (vírgula entre coords, ponto e vírgula, barra, espaço)
+  // Se contiver vírgula usada como decimal (ex: "-23,78428 -47,22237" ou "-23,78428, -47,22237"):
+  // Casos:
+  // 1) "-23.78428, -47.22237" -> dois números com ponto decimal
+  // 2) "-23,78428; -47,22237" -> ponto e vírgula separa coords, vírgula é decimal
+  // 3) "-23,78428 -47,22237" -> espaço separa coords, vírgula é decimal
+  // 4) "-23.78428 -47.22237" -> espaço separa coords, ponto é decimal
+
+  let num1: number | null = null
+  let num2: number | null = null
+
+  // Padrão A: ponto como decimal: "-23.78428, -47.22237" ou "-23.78428 -47.22237"
+  const dotPattern = /^(-?\d+(?:\.\d+)?)[,\s;/|]+(-?\d+(?:\.\d+)?)$/
+  const dotMatch = normalized.match(dotPattern)
+  if (dotMatch) {
+    num1 = parseFloat(dotMatch[1])
+    num2 = parseFloat(dotMatch[2])
+  } else {
+    // Padrão B: vírgula como separador decimal com delimitador ;, /, espaço ou barra
+    // Ex: "-23,78428; -47,22237" ou "-23,78428 / -47,22237" ou "-23,78428 -47,22237"
+    const commaDecimalPattern = /^(-?\d+(?:,\d+)?)[;\s/|]+(-?\d+(?:,\d+)?)$/
+    const commaMatch = normalized.match(commaDecimalPattern)
+    if (commaMatch) {
+      num1 = parseFloat(commaMatch[1].replace(',', '.'))
+      num2 = parseFloat(commaMatch[2].replace(',', '.'))
+    } else {
+      // Padrão C: 4 grupos numéricos separados por vírgula pura: "-23,78428,-47,22237"
+      const allCommaMatch = normalized.match(/^(-?\d+),(\d+),(-?\d+),(\d+)$/)
+      if (allCommaMatch) {
+        num1 = parseFloat(`${allCommaMatch[1]}.${allCommaMatch[2]}`)
+        num2 = parseFloat(`${allCommaMatch[3]}.${allCommaMatch[4]}`)
+      }
+    }
+  }
+
+  if (num1 === null || num2 === null || isNaN(num1) || isNaN(num2)) {
+    return null
+  }
+
+  // Verificar se um dos números é lat e o outro lng
+  // Validar limites matemáticos globais básicos (lat -90..90, lng -180..180)
+  let lat = num1
+  let lng = num2
+  let swapped = false
+
+  // Se num1 estiver fora de -90..90 mas dentro de -180..180, e num2 estiver dentro de -90..90, está invertido (lng, lat)
+  if (
+    (Math.abs(num1) > 90 && Math.abs(num2) <= 90) ||
+    // Heurística Brasil: Latitudes no Brasil variam de +5.3 a -33.8; Longitudes variam de -73.99 a -34.79
+    // Se num1 estiver na faixa típica de longitude do Brasil (-74 a -34) e num2 na faixa de latitude (+6 a -35), quase certamente está invertido!
+    (num1 < -34 && num1 > -75 && num2 > -35 && num2 < 6)
+  ) {
+    lat = num2
+    lng = num1
+    swapped = true
+  }
+
+  // Validação estrita de limites globais
+  if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+    return null
+  }
+
+  // Validação Brasil: latitude [-34, 6], longitude [-74, -34]
+  const isPlausibleBrazil = lat >= -34 && lat <= 6 && lng >= -74 && lng <= -34
+  // Ibiúna bounds aproximados: lat [-24.2, -23.3], lon [-47.5, -46.8]
+  const isWithinIbiuna = lat >= -24.2 && lat <= -23.3 && lng >= -47.5 && lng <= -46.8
+
+  let warning: string | undefined
+  if (!isPlausibleBrazil) {
+    warning = 'Coordenadas fora do território brasileiro.'
+  } else if (!isWithinIbiuna) {
+    warning = 'Coordenadas fora dos limites municipais de Ibiúna - SP.'
+  }
+
+  return {
+    latitude: Number(lat.toFixed(6)),
+    longitude: Number(lng.toFixed(6)),
+    isPlausibleBrazil,
+    isWithinIbiuna,
+    swappedOrder: swapped,
+    formatted: `${Number(lat.toFixed(5))}, ${Number(lng.toFixed(5))}`,
+    warning,
+  }
 }
 
 export interface ViaCepResult {
@@ -166,42 +290,83 @@ export async function reverseGeocode(
 export async function forwardGeocode(
   query: string,
   preferredCity?: string,
+  limit: number = 5,
+  signal?: AbortSignal,
 ): Promise<DirectGeocodeResult[]> {
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
-    throw new Error('Sem conexão de rede para geocodificação direta.')
+    throw new Error('Sem conexão de internet para buscar endereços.')
   }
 
   const cleanQuery = query.trim()
   if (!cleanQuery) return []
 
-  const finalQuery =
-    preferredCity && !cleanQuery.toLowerCase().includes(preferredCity.toLowerCase())
-      ? `${cleanQuery}, ${preferredCity}`
-      : cleanQuery
+  // Primeiro verifica se é coordenada decimal colada/digitada
+  const parsedCoord = parseCoordinateInput(cleanQuery)
+  if (parsedCoord) {
+    return [
+      {
+        latitude: parsedCoord.latitude,
+        longitude: parsedCoord.longitude,
+        displayName: `Coordenadas: ${parsedCoord.latitude}, ${parsedCoord.longitude}`,
+        isCoordinate: true,
+        warning: parsedCoord.warning,
+      },
+    ]
+  }
+
+  // Se a consulta não mencionar Ibiúna nem o município preferencial, adiciona o município para dar relevância
+  const citySuffix = preferredCity || 'Ibiúna'
+  const hasCityMention =
+    cleanQuery.toLowerCase().includes('ibiúna') ||
+    cleanQuery.toLowerCase().includes('ibiuna') ||
+    (preferredCity && cleanQuery.toLowerCase().includes(preferredCity.toLowerCase()))
+
+  const finalQuery = hasCityMention ? cleanQuery : `${cleanQuery}, ${citySuffix}`
 
   const url = `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(
     finalQuery,
-  )}&limit=3&countrycodes=br`
+  )}&limit=${limit}&countrycodes=br&addressdetails=1`
 
-  const res = await fetch(url, {
-    headers: {
-      'Accept-Language': 'pt-BR,pt;q=0.9',
-    },
-    signal: AbortSignal.timeout(8000),
-  })
-
-  if (!res.ok) {
-    throw new Error(`Serviço de busca no mapa indisponível (${res.status}).`)
+  // Combina o signal recebido com um timeout de 8 segundos
+  const abortController = new AbortController()
+  const timeoutId = setTimeout(() => abortController.abort(), 8000)
+  if (signal) {
+    signal.addEventListener('abort', () => abortController.abort())
   }
 
-  const list = await res.json()
-  if (!Array.isArray(list)) return []
+  try {
+    const res = await fetch(url, {
+      headers: {
+        'Accept-Language': 'pt-BR,pt;q=0.9',
+      },
+      signal: abortController.signal,
+    })
 
-  return list.map((item) => ({
-    latitude: parseFloat(item.lat),
-    longitude: parseFloat(item.lon),
-    displayName: item.display_name,
-  }))
+    if (!res.ok) {
+      throw new Error(`Serviço de busca de endereço indisponível (${res.status}).`)
+    }
+
+    const list = await res.json()
+    if (!Array.isArray(list)) return []
+
+    return list.map((item) => ({
+      latitude: parseFloat(item.lat),
+      longitude: parseFloat(item.lon),
+      displayName: item.display_name,
+      address: item.address
+        ? {
+            road: item.address.road || item.address.street,
+            suburb: item.address.suburb || item.address.neighbourhood,
+            city: item.address.city || item.address.town || item.address.municipality,
+            town: item.address.town,
+            state: item.address.state,
+            postcode: item.address.postcode,
+          }
+        : undefined,
+    }))
+  } finally {
+    clearTimeout(timeoutId)
+  }
 }
 
 /**
