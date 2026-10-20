@@ -940,7 +940,7 @@ export const UrbanDevelopmentPage: React.FC = () => {
                     <span>
                       {intersectionAnalysis.result === 'intersecao_encontrada'
                         ? 'Interseção encontrada na base consultada'
-                        : item.intersection_result === 'nenhuma_intersecao_encontrada'
+                        : intersectionAnalysis.result === 'nenhuma_intersecao_encontrada'
                           ? 'Nenhuma interseção encontrada na base consultada'
                           : 'Consulta inconclusiva — base geográfica indisponível ou incompleta'}{' '}
                     </span>
