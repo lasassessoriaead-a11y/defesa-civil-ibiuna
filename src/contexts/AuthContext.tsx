@@ -44,6 +44,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: rec.name || 'Operador',
         avatar: rec.avatar,
         role: (rec.role as UserRole) || 'agente',
+        department: (rec.department as any) || undefined,
         municipality: rec.municipality || undefined,
       }
       setUser(u)
@@ -95,6 +96,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       name: authData.record.name || 'Operador',
       avatar: authData.record.avatar,
       role: (authData.record.role as UserRole) || 'agente',
+      department: (authData.record.department as any) || undefined,
       municipality: authData.record.municipality || undefined,
     }
     setUser(u)
@@ -141,6 +143,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         name: rec.name || 'Operador',
         avatar: rec.avatar,
         role: (rec.role as UserRole) || 'agente',
+        department: (rec.department as any) || undefined,
         municipality: rec.municipality || undefined,
       }
       setUser(u)

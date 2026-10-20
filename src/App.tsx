@@ -24,6 +24,10 @@ import { StrategicInfrastructuresPage } from '@/pages/StrategicInfrastructuresPa
 import { BridgeConferencePage } from '@/pages/BridgeConferencePage'
 import { RiskSectorsPage } from '@/pages/RiskSectorsPage'
 import { InteragencyDemandsPage } from '@/pages/InteragencyDemandsPage'
+import { SecretariasWorkspacePage } from '@/pages/SecretariasWorkspacePage'
+import { UrbanDevelopmentPage } from '@/pages/UrbanDevelopmentPage'
+import { FamiliesSurveyPage } from '@/pages/FamiliesSurveyPage'
+import { ContingencyPlansPage } from '@/pages/ContingencyPlansPage'
 import NotFound from '@/pages/NotFound'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -104,6 +108,10 @@ export const App: React.FC = () => {
             <Route path="/setores-risco" element={<RiskSectorsPage />} />
             <Route path="/infraestruturas" element={<StrategicInfrastructuresPage />} />
             <Route path="/pontes-conferencia" element={<BridgeConferencePage />} />
+            <Route path="/secretarias-atuacao" element={<SecretariasWorkspacePage />} />
+            <Route path="/desenvolvimento-urbano" element={<UrbanDevelopmentPage />} />
+            <Route path="/levantamento-familias" element={<FamiliesSurveyPage />} />
+            <Route path="/planos-contingencia" element={<ContingencyPlansPage />} />
             <Route path="/demandas-secretarias" element={<InteragencyDemandsPage />} />
             <Route path="/importacao-dados" element={<RiskImportPage />} />
             <Route path="/importacao-risco" element={<RiskImportPage />} />

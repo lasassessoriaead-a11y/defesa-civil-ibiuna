@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-20T01:54:52.761Z",
+  "generatedAt": "2026-10-20T02:31:36.382Z",
   "collections": [
     {
       "name": "users",
@@ -51,6 +51,24 @@
           "required": false,
           "system": false,
           "collectionRef": "municipalities"
+        },
+        {
+          "name": "department",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "defesa_civil",
+            "desenvolvimento_urbano",
+            "assistencia_social",
+            "saude",
+            "educacao",
+            "obras",
+            "meio_ambiente",
+            "servicos_municipais",
+            "administracao",
+            "outras"
+          ]
         }
       ],
       "indexes": [
@@ -392,6 +410,127 @@
           "required": false,
           "system": false,
           "collectionRef": "municipalities"
+        },
+        {
+          "name": "facility_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "escola",
+            "creche",
+            "ginasio",
+            "centro_comunitario",
+            "igreja",
+            "equipamento_publico",
+            "outro"
+          ]
+        },
+        {
+          "name": "shelter_classification",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "escola_cadastrada",
+            "candidato_avaliacao_pendente",
+            "abrigo_aprovado",
+            "abrigo_ativado",
+            "indisponivel"
+          ]
+        },
+        {
+          "name": "responsible_secretary",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "educacao",
+            "defesa_civil",
+            "assistencia_social",
+            "saude",
+            "esportes",
+            "obras",
+            "outras"
+          ]
+        },
+        {
+          "name": "contact_person",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "has_accessibility",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "has_water",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "has_generator_power",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "restrooms_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "has_kitchen",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "rooms_available",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "assessed_capacity",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "capacity_assessed_by",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "capacity_assessed_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "usage_restrictions",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "access_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "bridge_dependency",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": ["CREATE INDEX idx_shelters_status ON shelters (status)"]
@@ -2375,6 +2514,114 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "communities_served",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "families_dependent_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "persons_dependent_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "main_route_description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "has_alternative_access",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "acesso_alternativo_confirmado",
+            "possivel_isolamento",
+            "sem_alternativa_identificada",
+            "ainda_nao_verificado"
+          ]
+        },
+        {
+          "name": "detour_route_description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "detour_distance_km",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "detour_time_minutes",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "detour_estimate_method",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "detour_estimate_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "rainy_season_condition",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ambulance_passable",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "school_bus_passable",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "service_truck_passable",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "known_restrictions",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "isolation_contingency_plan",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "routes_geojson",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -3493,6 +3740,968 @@
       "indexes": [
         "CREATE INDEX idx_mga_target ON municipal_geo_adjustments (municipality, target_collection, target_id)",
         "CREATE INDEX idx_mga_code ON municipal_geo_adjustments (municipality, code)"
+      ]
+    },
+    {
+      "name": "urban_consultations",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "process_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "requester_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "purpose",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "loteamento",
+            "desmembramento",
+            "parcelamento",
+            "construcao",
+            "regularizacao",
+            "outro"
+          ]
+        },
+        {
+          "name": "location_address",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "neighborhood",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "latitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "longitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "perimeter_geojson",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "perimeter_source",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["desenhado_mapa", "importado_geojson", "ponto_preliminar"]
+        },
+        {
+          "name": "responsible_officer",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "department_sender",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "analysis_status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "registrada",
+            "encaminhada_analise",
+            "em_analise_tecnica",
+            "vistoria_solicitada",
+            "parecer_emitido",
+            "arquivada"
+          ]
+        },
+        {
+          "name": "intersection_result",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "intersecao_encontrada",
+            "nenhuma_intersecao_encontrada",
+            "inconclusiva_informacao_insuficiente"
+          ]
+        },
+        {
+          "name": "intersection_details",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "technical_disclaimer",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observations",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_urb_cons_mun_proc ON urban_consultations (municipality, process_number)",
+        "CREATE INDEX idx_urb_cons_status ON urban_consultations (municipality, analysis_status)"
+      ]
+    },
+    {
+      "name": "surveyed_families",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "family_internal_code",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "responsible_name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "contact_phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "neighborhood",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "latitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "longitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "members_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "children_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "elderly_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "disabled_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "has_mobility_limitation",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "needs_accessible_transport",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "special_support_needs",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "communication_preferences",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "risk_sector_code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "danger_stretch_code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "crossing_infrastructure_codes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "visit_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "survey_team",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "information_source",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "survey_status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["declarada", "observada", "conferida", "pendente"]
+        },
+        {
+          "name": "update_needed",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "duplicate_review_status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["ok", "possivel_duplicidade", "revisado_sem_fusao"]
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_fam_mun_code ON surveyed_families (municipality, family_internal_code)",
+        "CREATE INDEX idx_fam_status ON surveyed_families (municipality, survey_status)"
+      ]
+    },
+    {
+      "name": "social_family_actions",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "family",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "surveyed_families"
+        },
+        {
+          "name": "action_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "atendimento_cras_creas",
+            "encaminhamento_beneficio",
+            "acompanhamento_continuo",
+            "necessidade_acolhimento",
+            "reassentamento_preventivo",
+            "aluguel_social",
+            "outro"
+          ]
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "responsible_worker",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "action_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["aberto", "em_andamento", "concluido", "cancelado"]
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_soc_mun_fam ON social_family_actions (municipality, family)"]
+    },
+    {
+      "name": "health_operational_needs",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "family",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "surveyed_families"
+        },
+        {
+          "name": "mobility_support_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "nenhum",
+            "maca",
+            "cadeira_rodas",
+            "ambulancia_simples",
+            "ambulancia_uti"
+          ]
+        },
+        {
+          "name": "requires_power_equipment",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "power_equipment_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "care_continuity_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "priority_level",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["normal", "alta", "imediata_evacuacao"]
+        },
+        {
+          "name": "health_unit_reference",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "verified_by_nurse_or_agent",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["pendente", "atendido", "monitorado", "encaminhado"]
+        },
+        {
+          "name": "created_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_hlth_mun_fam ON health_operational_needs (municipality, family)"
+      ]
+    },
+    {
+      "name": "contingency_plans",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "plan_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "plano_municipal_defesa_civil",
+            "plano_comunitario_cenario",
+            "plano_setorial_saude_el_nino",
+            "plano_setorial_educacao",
+            "plano_setorial_obras",
+            "plano_setorial_assistencia",
+            "plano_setorial_desenvolvimento_urbano"
+          ]
+        },
+        {
+          "name": "version_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "rascunho",
+            "em_revisao",
+            "aguardando_aprovacao",
+            "aprovado_vigente",
+            "substituido_arquivado"
+          ]
+        },
+        {
+          "name": "scope_and_objectives",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "risk_scenarios",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "monitoring_and_triggers",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "responsibilities_and_roles",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "operational_contacts",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "affected_communities_and_population",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "evacuation_routes_and_meeting_points",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "accessible_transport_and_care",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "shelters_and_logistics",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "response_and_recovery_actions",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "drills_and_lessons_learned",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sorocaba_workshop_commitments",
+          "type": "editor",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "information_sources",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approver_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approver_role",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approval_document_ref",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approval_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "parent_plan_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_plan_mun_type ON contingency_plans (municipality, plan_type)",
+        "CREATE INDEX idx_plan_mun_status ON contingency_plans (municipality, status)"
+      ]
+    },
+    {
+      "name": "official_references_library",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && (municipality = @request.auth.municipality || municipality = '')",
+        "view": "@request.auth.id != '' && (municipality = @request.auth.municipality || municipality = '')",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "issuing_agency",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "scope",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["estadual", "regional_sorocaba", "federal", "municipal"]
+        },
+        {
+          "name": "category",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": [
+            "plano_estadual",
+            "protocolo_operacional",
+            "diretriz_tecnica",
+            "mapa_referencia",
+            "legislacao",
+            "outro"
+          ]
+        },
+        {
+          "name": "official_source",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "document_date",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "version",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pertinent_scenarios",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "document_file",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "external_link",
+          "type": "url",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "availability_status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["disponivel", "pendente_obtencao", "em_revisao"]
+        },
+        {
+          "name": "summary",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created_by",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "users"
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_ref_agency ON official_references_library (issuing_agency)",
+        "CREATE INDEX idx_ref_scope ON official_references_library (scope)"
+      ]
+    },
+    {
+      "name": "sector_workspaces_config",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "update": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && @request.auth.role = 'administrador'"
+      },
+      "fields": [
+        {
+          "name": "municipality",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "municipalities"
+        },
+        {
+          "name": "department_key",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "department_title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "lead_person",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "contact_channel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "custom_categories",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "complementary_fields",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_sec_cfg_mun_key ON sector_workspaces_config (municipality, department_key)"
       ]
     }
   ]

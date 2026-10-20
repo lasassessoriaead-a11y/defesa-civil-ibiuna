@@ -277,6 +277,28 @@ export interface StrategicInfrastructure extends RecordModel {
   verified_by?: string
   verified_at?: string
   verification_notes?: string
+  // Relações operacionais de dependência e isolamento
+  communities_served?: string
+  families_dependent_count?: number
+  persons_dependent_count?: number
+  main_route_description?: string
+  has_alternative_access?:
+    | 'acesso_alternativo_confirmado'
+    | 'possivel_isolamento'
+    | 'sem_alternativa_identificada'
+    | 'ainda_nao_verificado'
+  detour_route_description?: string
+  detour_distance_km?: number
+  detour_time_minutes?: number
+  detour_estimate_method?: string
+  detour_estimate_date?: string
+  rainy_season_condition?: string
+  ambulance_passable?: boolean
+  school_bus_passable?: boolean
+  service_truck_passable?: boolean
+  known_restrictions?: string
+  isolation_contingency_plan?: string
+  routes_geojson?: string
   expand?: {
     verified_by?: User
     municipality?: Municipality
@@ -526,18 +548,50 @@ export interface AuditLogEntry extends RecordModel {
 
 export type ShelterStatus = 'ativo' | 'cheio' | 'inativo'
 
+export type FacilityType =
+  | 'escola'
+  | 'creche'
+  | 'ginasio'
+  | 'centro_comunitario'
+  | 'igreja'
+  | 'equipamento_publico'
+  | 'outro'
+
+export type ShelterClassification =
+  | 'escola_cadastrada'
+  | 'candidato_avaliacao_pendente'
+  | 'abrigo_aprovado'
+  | 'abrigo_ativado'
+  | 'indisponivel'
+
 export interface Shelter extends RecordModel {
   name: string
   address?: string
   latitude?: number
   longitude?: number
   capacity: number
-  occupancy?: number
+  occupancy: number
   status: ShelterStatus
   contact?: string
   municipality?: string
+  // Extensões de Educação e Acolhimento
+  facility_type?: FacilityType
+  shelter_classification?: ShelterClassification
+  responsible_secretary?: string
+  contact_person?: string
+  has_accessibility?: boolean
+  has_water?: boolean
+  has_generator_power?: boolean
+  restrooms_count?: number
+  has_kitchen?: boolean
+  rooms_available?: number
+  assessed_capacity?: number
+  capacity_assessed_by?: string
+  capacity_assessed_date?: string
+  usage_restrictions?: string
+  access_notes?: string
+  bridge_dependency?: string
 }
-
 export type TeamType =
   | 'resgate'
   | 'saude'
@@ -636,12 +690,25 @@ export interface AffectedArea extends RecordModel {
   municipality?: string
 }
 
+export type DepartmentKey =
+  | 'defesa_civil'
+  | 'desenvolvimento_urbano'
+  | 'assistencia_social'
+  | 'saude'
+  | 'educacao'
+  | 'obras'
+  | 'meio_ambiente'
+  | 'servicos_municipais'
+  | 'administracao'
+  | 'outras'
+
 export interface User {
   id: string
   email: string
   name?: string
   avatar?: string
   role?: UserRole
+  department?: DepartmentKey
   municipality?: string
   expand?: {
     municipality?: Municipality
@@ -728,4 +795,241 @@ export interface MunicipalGeoAdjustment extends RecordModel {
   expand?: {
     author?: User
   }
+}
+
+// -------------------------------------------------------------
+// GESTÃO INTERSETORIAL DE RISCOS E CONTINGÊNCIA (v0.0.35)
+// -------------------------------------------------------------
+
+export type UrbanConsultationPurpose =
+  | 'loteamento'
+  | 'desmembramento'
+  | 'parcelamento'
+  | 'construcao'
+  | 'regularizacao'
+  | 'outro'
+
+export type UrbanIntersectionResult =
+  | 'intersecao_encontrada'
+  | 'nenhuma_intersecao_encontrada'
+  | 'inconclusiva_informacao_insuficiente'
+
+export type UrbanAnalysisStatus =
+  | 'registrada'
+  | 'encaminhada_analise'
+  | 'em_analise_tecnica'
+  | 'vistoria_solicitada'
+  | 'parecer_emitido'
+  | 'arquivada'
+
+export interface UrbanConsultation extends RecordModel {
+  municipality: string
+  process_number: string
+  requester_name?: string
+  purpose?: UrbanConsultationPurpose
+  location_address: string
+  neighborhood?: string
+  latitude?: number
+  longitude?: number
+  perimeter_geojson?: string
+  perimeter_source?: 'desenhado_mapa' | 'importado_geojson' | 'ponto_preliminar'
+  responsible_officer?: string
+  department_sender?: string
+  analysis_status: UrbanAnalysisStatus
+  intersection_result: UrbanIntersectionResult
+  intersection_details?: {
+    intersections?: Array<{
+      layer: string
+      name?: string
+      code?: string
+      risk_level?: string
+      source: string
+      date?: string
+      notes?: string
+    }>
+    layers_consulted?: string[]
+    evaluation_date?: string
+    technical_limitations?: string
+  }
+  technical_disclaimer?: string
+  observations?: string
+  created_by?: string
+  expand?: {
+    created_by?: User
+    municipality?: Municipality
+  }
+}
+
+export type SurveyStatus = 'declarada' | 'observada' | 'conferida' | 'pendente'
+export type DuplicateReviewStatus = 'ok' | 'possivel_duplicidade' | 'revisado_sem_fusao'
+
+export interface SurveyedFamily extends RecordModel {
+  municipality: string
+  family_internal_code: string
+  responsible_name: string
+  contact_phone?: string
+  address: string
+  neighborhood?: string
+  latitude?: number
+  longitude?: number
+  members_count?: number
+  children_count?: number
+  elderly_count?: number
+  disabled_count?: number
+  has_mobility_limitation?: boolean
+  needs_accessible_transport?: boolean
+  special_support_needs?: string
+  communication_preferences?: string
+  risk_sector_code?: string
+  danger_stretch_code?: string
+  crossing_infrastructure_codes?: string
+  visit_date?: string
+  survey_team?: string
+  information_source?: string
+  survey_status: SurveyStatus
+  update_needed?: boolean
+  duplicate_review_status?: DuplicateReviewStatus
+  notes?: string
+  created_by?: string
+  expand?: {
+    created_by?: User
+    municipality?: Municipality
+  }
+}
+
+export type SocialActionType =
+  | 'atendimento_cras_creas'
+  | 'encaminhamento_beneficio'
+  | 'acompanhamento_continuo'
+  | 'necessidade_acolhimento'
+  | 'reassentamento_preventivo'
+  | 'aluguel_social'
+  | 'outro'
+
+export interface SocialFamilyAction extends RecordModel {
+  municipality: string
+  family: string
+  action_type: SocialActionType
+  description: string
+  responsible_worker?: string
+  action_date?: string
+  status: 'aberto' | 'em_andamento' | 'concluido' | 'cancelado'
+  notes?: string
+  created_by?: string
+  expand?: {
+    family?: SurveyedFamily
+    created_by?: User
+  }
+}
+
+export interface HealthOperationalNeed extends RecordModel {
+  municipality: string
+  family: string
+  mobility_support_type?:
+    | 'nenhum'
+    | 'maca'
+    | 'cadeira_rodas'
+    | 'ambulancia_simples'
+    | 'ambulancia_uti'
+  requires_power_equipment?: boolean
+  power_equipment_notes?: string
+  care_continuity_notes?: string
+  priority_level?: 'normal' | 'alta' | 'imediata_evacuacao'
+  health_unit_reference?: string
+  verified_by_nurse_or_agent?: string
+  status: 'pendente' | 'atendido' | 'monitorado' | 'encaminhado'
+  created_by?: string
+  expand?: {
+    family?: SurveyedFamily
+    created_by?: User
+  }
+}
+
+export type ContingencyPlanType =
+  | 'plano_municipal_defesa_civil'
+  | 'plano_comunitario_cenario'
+  | 'plano_setorial_saude_el_nino'
+  | 'plano_setorial_educacao'
+  | 'plano_setorial_obras'
+  | 'plano_setorial_assistencia'
+  | 'plano_setorial_desenvolvimento_urbano'
+
+export type ContingencyPlanStatus =
+  | 'rascunho'
+  | 'em_revisao'
+  | 'aguardando_aprovacao'
+  | 'aprovado_vigente'
+  | 'substituido_arquivado'
+
+export interface ContingencyPlan extends RecordModel {
+  municipality: string
+  title: string
+  plan_type: ContingencyPlanType
+  version_number: string
+  status: ContingencyPlanStatus
+  scope_and_objectives?: string
+  risk_scenarios?: string
+  monitoring_and_triggers?: string
+  responsibilities_and_roles?: string
+  operational_contacts?: string
+  affected_communities_and_population?: string
+  evacuation_routes_and_meeting_points?: string
+  accessible_transport_and_care?: string
+  shelters_and_logistics?: string
+  response_and_recovery_actions?: string
+  drills_and_lessons_learned?: string
+  sorocaba_workshop_commitments?: string
+  information_sources?: string
+  approver_name?: string
+  approver_role?: string
+  approval_document_ref?: string
+  approval_date?: string
+  parent_plan_id?: string
+  created_by?: string
+  expand?: {
+    created_by?: User
+    municipality?: Municipality
+  }
+}
+
+export interface OfficialReferenceLibraryItem extends RecordModel {
+  municipality?: string
+  title: string
+  issuing_agency: string
+  scope: 'estadual' | 'regional_sorocaba' | 'federal' | 'municipal'
+  category:
+    | 'plano_estadual'
+    | 'protocolo_operacional'
+    | 'diretriz_tecnica'
+    | 'mapa_referencia'
+    | 'legislacao'
+    | 'outro'
+  official_source: string
+  document_date?: string
+  version?: string
+  pertinent_scenarios?: string
+  document_file?: string
+  external_link?: string
+  availability_status: 'disponivel' | 'pendente_obtencao' | 'em_revisao'
+  summary?: string
+  created_by?: string
+  expand?: {
+    created_by?: User
+  }
+}
+
+export interface SectorWorkspaceConfig extends RecordModel {
+  municipality: string
+  department_key: string
+  department_title: string
+  lead_person?: string
+  contact_channel?: string
+  custom_categories?: string[]
+  complementary_fields?: Array<{
+    name: string
+    label: string
+    type: 'text' | 'number' | 'select' | 'date' | 'bool'
+    options?: string[]
+  }>
+  is_active?: boolean
 }

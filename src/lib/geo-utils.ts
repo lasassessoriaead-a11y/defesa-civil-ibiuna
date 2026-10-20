@@ -249,3 +249,54 @@ export function findContainingSector(
 
   return null
 }
+
+/**
+ * Verifica se dois segmentos de reta [p1, p2] e [p3, p4] se cruzam
+ */
+function ccw(A: [number, number], B: [number, number], C: [number, number]): boolean {
+  return (C[1] - A[1]) * (B[0] - A[0]) > (B[1] - A[1]) * (C[0] - A[0])
+}
+
+function doLinesIntersect(
+  p1: [number, number],
+  p2: [number, number],
+  p3: [number, number],
+  p4: [number, number],
+): boolean {
+  return ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4)
+}
+
+/**
+ * Testa interseção entre dois polígonos ou entre polígono e line-string
+ */
+export function checkPolygonIntersection(
+  polyA: [number, number][],
+  polyB: [number, number][],
+): boolean {
+  if (!polyA || polyA.length < 3 || !polyB || polyB.length < 2) return false
+
+  // 1. Se qualquer vértice de A está dentro de B
+  for (const pt of polyA) {
+    if (polyB.length >= 3 && isPointInPolygon(pt, polyB)) return true
+  }
+
+  // 2. Se qualquer vértice de B está dentro de A
+  for (const pt of polyB) {
+    if (isPointInPolygon(pt, polyA)) return true
+  }
+
+  // 3. Se quaisquer arestas se cruzam
+  for (let i = 0; i < polyA.length; i++) {
+    const a1 = polyA[i]
+    const a2 = polyA[(i + 1) % polyA.length]
+
+    for (let j = 0; j < polyB.length; j++) {
+      const b1 = polyB[j]
+      const b2 = polyB[(j + 1) % polyB.length]
+
+      if (doLinesIntersect(a1, a2, b1, b2)) return true
+    }
+  }
+
+  return false
+}

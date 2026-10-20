@@ -25,6 +25,7 @@ import {
   FileText,
   TreeDeciduous,
   FileSpreadsheet,
+  BookOpen,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -52,6 +53,10 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { title: 'Painel de Monitoramento', href: '/painel', icon: LayoutDashboard },
+  { title: 'Secretarias Integradas', href: '/secretarias-atuacao', icon: Building2 },
+  { title: 'Consulta Urbana', href: '/desenvolvimento-urbano', icon: Building2 },
+  { title: 'Levantamento de Famílias', href: '/levantamento-familias', icon: Users },
+  { title: 'Planos de Contingência', href: '/planos-contingencia', icon: BookOpen },
   { title: 'Ocorrências', href: '/ocorrencias', icon: AlertTriangle },
   { title: 'Setores de Risco', href: '/setores-risco', icon: ShieldAlert },
   { title: 'Infraestruturas', href: '/infraestruturas', icon: Building2 },
@@ -153,7 +158,7 @@ export const Layout: React.FC = () => {
                 {user?.role ? user.role.toUpperCase() : 'MUNICIPAL'}
               </p>
               <span className="text-[9px] font-mono text-slate-400 bg-slate-800/80 px-1 py-0.2 rounded border border-slate-700">
-                v0.0.33
+                v0.0.35
               </span>
             </div>
           </div>
@@ -340,7 +345,7 @@ export const Layout: React.FC = () => {
                   <span className="font-bold text-sm block leading-tight">
                     Defesa Civil Municipal
                   </span>
-                  <span className="text-[10px] font-mono text-slate-400">v0.0.33</span>
+                  <span className="text-[10px] font-mono text-slate-400">v0.0.35</span>
                 </div>
               </div>
               <Button

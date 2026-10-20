@@ -39,7 +39,13 @@ import {
 import { InteractiveMap } from '@/components/defesa-civil/InteractiveMap'
 import { ShelterStatusBadge, SHELTER_STATUS_LABELS } from '@/components/defesa-civil/StatusBadges'
 import { sheltersService, getErrorMessage } from '@/services/defesa-civil'
-import type { Shelter, ShelterStatus } from '@/types/defesa-civil'
+import type {
+  Shelter,
+  ShelterStatus,
+  FacilityType,
+  ShelterClassification,
+} from '@/types/defesa-civil'
+import { RecordAttachmentsTab } from '@/components/defesa-civil/RecordAttachmentsTab'
 import { useRealtime } from '@/hooks/use-realtime'
 import { useToast } from '@/hooks/use-toast'
 
@@ -65,6 +71,22 @@ export const SheltersPage: React.FC = () => {
     contact: '',
     latitude: -23.5505,
     longitude: -46.6333,
+    facility_type: 'escola',
+    shelter_classification: 'escola_cadastrada',
+    responsible_secretary: 'educacao',
+    contact_person: '',
+    has_accessibility: false,
+    has_water: true,
+    has_generator_power: false,
+    restrooms_count: 4,
+    has_kitchen: true,
+    rooms_available: 5,
+    assessed_capacity: 80,
+    capacity_assessed_by: '',
+    capacity_assessed_date: '',
+    usage_restrictions: '',
+    access_notes: '',
+    bridge_dependency: '',
   })
   const [isGeocoding, setIsGeocoding] = useState(false)
 
@@ -293,6 +315,24 @@ export const SheltersPage: React.FC = () => {
         </Card>
       </div>
 
+      {/* Alerta de Segurança e Distinção de Status Operacional */}
+      <div className="p-4 bg-purple-50 border border-purple-200 rounded-xl text-xs text-purple-950 flex items-start gap-3">
+        <Building2 className="w-5 h-5 text-purple-700 shrink-0 mt-0.5" />
+        <div className="space-y-1">
+          <p className="font-bold text-purple-900">
+            Diretriz de Educação e Acolhimento Humanizado:
+          </p>
+          <p className="text-slate-700 leading-relaxed">
+            Distinção rigorosa entre <strong>Escola Cadastrada</strong>,{' '}
+            <strong>Candidato com Avaliação Pendente</strong>, <strong>Abrigo Aprovado</strong> e{' '}
+            <strong>Abrigo Ativado</strong>. Uma escola não é convertida em abrigo automaticamente
+            por mera proximidade com enchente; a homologação requer comprovação de acessibilidade,
+            água potável, gerador elétrico, banheiros e rota de acesso desimpedida de pontes
+            críticas.
+          </p>
+        </div>
+      </div>
+
       {/* Search and Filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
@@ -354,7 +394,17 @@ export const SheltersPage: React.FC = () => {
                       </p>
                     </div>
                   </div>
-                  <ShelterStatusBadge status={shelter.status} />
+                  <div className="flex flex-col items-end gap-1">
+                    <ShelterStatusBadge status={shelter.status} />
+                    {shelter.shelter_classification && (
+                      <Badge
+                        variant="outline"
+                        className="text-[9px] uppercase tracking-wider font-semibold"
+                      >
+                        {shelter.shelter_classification.replace(/_/g, ' ')}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
               </CardHeader>
 
@@ -554,6 +604,165 @@ export const SheltersPage: React.FC = () => {
               />
             </div>
 
+            {/* Classificação Técnica e Secretaria Responsável */}
+            <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg space-y-3">
+              <h4 className="font-bold text-slate-800 text-xs">
+                Classificação & Infraestrutura Técnica
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-700">
+                    Classificação Operacional
+                  </Label>
+                  <Select
+                    value={formData.shelter_classification || 'escola_cadastrada'}
+                    onValueChange={(v) =>
+                      setFormData({ ...formData, shelter_classification: v as any })
+                    }
+                  >
+                    <SelectTrigger className="h-8 text-xs mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="escola_cadastrada">
+                        Escola ou Equipamento Cadastrado
+                      </SelectItem>
+                      <SelectItem value="candidato_avaliacao_pendente">
+                        Candidato - Avaliação Pendente
+                      </SelectItem>
+                      <SelectItem value="abrigo_aprovado">
+                        Abrigo Aprovado (Cenário Validado)
+                      </SelectItem>
+                      <SelectItem value="abrigo_ativado">Abrigo Ativado em Operação</SelectItem>
+                      <SelectItem value="indisponivel">Indisponível</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-700">
+                    Tipo de Equipamento
+                  </Label>
+                  <Select
+                    value={formData.facility_type || 'escola'}
+                    onValueChange={(v) => setFormData({ ...formData, facility_type: v as any })}
+                  >
+                    <SelectTrigger className="h-8 text-xs mt-1">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="escola">Escola Municipal</SelectItem>
+                      <SelectItem value="creche">Creche Municipal</SelectItem>
+                      <SelectItem value="ginasio">Ginásio de Esportes</SelectItem>
+                      <SelectItem value="centro_comunitario">Centro Comunitário</SelectItem>
+                      <SelectItem value="igreja">Igreja / Salão Paroquial</SelectItem>
+                      <SelectItem value="equipamento_publico">Outro Prédio Público</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-700">
+                    Secretaria Mantenedora
+                  </Label>
+                  <Input
+                    placeholder="Ex: Educação / Esportes"
+                    value={formData.responsible_secretary || ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, responsible_secretary: e.target.value })
+                    }
+                    className="h-8 text-xs mt-1"
+                  />
+                </div>
+              </div>
+
+              {/* Recursos de Infraestrutura */}
+              <div className="flex flex-wrap gap-4 pt-1 text-slate-700">
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.has_accessibility}
+                    onChange={(e) =>
+                      setFormData({ ...formData, has_accessibility: e.target.checked })
+                    }
+                    className="rounded text-blue-600"
+                  />
+                  <span>Acessibilidade PCD</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.has_water ?? true}
+                    onChange={(e) => setFormData({ ...formData, has_water: e.target.checked })}
+                    className="rounded text-blue-600"
+                  />
+                  <span>Água Potável / Caixa d'água</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={!!formData.has_generator_power}
+                    onChange={(e) =>
+                      setFormData({ ...formData, has_generator_power: e.target.checked })
+                    }
+                    className="rounded text-blue-600"
+                  />
+                  <span>Gerador de Energia</span>
+                </label>
+                <label className="flex items-center gap-1.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.has_kitchen ?? true}
+                    onChange={(e) => setFormData({ ...formData, has_kitchen: e.target.checked })}
+                    className="rounded text-blue-600"
+                  />
+                  <span>Cozinha / Refeitório</span>
+                </label>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3 pt-1">
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-700">
+                    Banheiros Disponíveis
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.restrooms_count ?? ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, restrooms_count: Number(e.target.value) })
+                    }
+                    className="h-8 text-xs mt-1"
+                  />
+                </div>
+                <div>
+                  <Label className="text-[11px] font-semibold text-slate-700">
+                    Salas / Espaços Livres
+                  </Label>
+                  <Input
+                    type="number"
+                    min="0"
+                    value={formData.rooms_available ?? ''}
+                    onChange={(e) =>
+                      setFormData({ ...formData, rooms_available: Number(e.target.value) })
+                    }
+                    className="h-8 text-xs mt-1"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-[11px] font-semibold text-slate-700">
+                  Dependência de Pontes / Restrições de Acesso
+                </Label>
+                <Input
+                  placeholder="Ex: Acesso bloqueado se a Ponte P2 estiver interditada..."
+                  value={formData.bridge_dependency || ''}
+                  onChange={(e) => setFormData({ ...formData, bridge_dependency: e.target.value })}
+                  className="h-8 text-xs mt-1"
+                />
+              </div>
+            </div>
             {/* Endereço com geocodificação via Nominatim (OpenStreetMap) */}
             <div className="space-y-1.5">
               <Label className="text-xs font-semibold text-slate-700">Endereço / Referência</Label>

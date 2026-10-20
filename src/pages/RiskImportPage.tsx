@@ -45,6 +45,7 @@ import {
   type ParsedRiskRow,
 } from '@/services/xlsx-parser-service'
 import { IptGeoJsonPanel } from '@/components/defesa-civil/IptGeoJsonPanel'
+import { AssistedImportTab } from '@/components/defesa-civil/AssistedImportTab'
 import {
   riskSectorsService,
   dangerStretchesService,
@@ -66,7 +67,7 @@ export const RiskImportPage: React.FC = () => {
   const [importBatches, setImportBatches] = useState<GeoImportBatch[]>([])
   const [isLoadingBatches, setIsLoadingBatches] = useState(false)
   const [activeImportSection, setActiveImportSection] = useState<
-    'ipt_geojson' | 'xlsx' | 'official_gpkg'
+    'ipt_geojson' | 'xlsx' | 'official_gpkg' | 'assisted_multiformat'
   >('ipt_geojson')
   const [filterTab, setFilterTab] = useState<
     'all' | 'sectors' | 'stretches' | 'totalizers' | 'rejected'
@@ -365,7 +366,33 @@ export const RiskImportPage: React.FC = () => {
           <Globe2 className="w-4 h-4 text-blue-600" />
           Repositório GPKG / KMZ (14 Arquivos)
         </button>
+
+        <button
+          onClick={() => setActiveImportSection('assisted_multiformat')}
+          className={`px-4 py-2 text-xs font-bold border-b-2 transition-colors flex items-center gap-2 ${
+            activeImportSection === 'assisted_multiformat'
+              ? 'border-purple-600 text-purple-800 bg-purple-50/50'
+              : 'border-transparent text-slate-600 hover:text-slate-900'
+          }`}
+        >
+          <Layers className="w-4 h-4 text-purple-600" />
+          Importação Assistida Multiformato
+          <Badge className="bg-purple-600 text-white text-[10px] ml-1">Secretarias</Badge>
+        </button>
       </div>
+
+      {/* SEÇÃO IMPORTAÇÃO ASSISTIDA MULTIFORMATO */}
+      {activeImportSection === 'assisted_multiformat' && (
+        <React.Suspense
+          fallback={
+            <div className="p-8 text-center text-xs text-slate-500">
+              Carregando módulo assistido...
+            </div>
+          }
+        >
+          <AssistedImportTab />
+        </React.Suspense>
+      )}
 
       {/* SEÇÃO IPT GEOJSON (FOCO DA TAREFA) */}
       {activeImportSection === 'ipt_geojson' && (

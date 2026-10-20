@@ -1041,6 +1041,11 @@ export const recordAttachmentsService = {
         requestKey: null,
       })
   },
+  async create(data: FormData | Partial<import('@/types/defesa-civil').RecordAttachment>) {
+    return pb
+      .collection('record_attachments')
+      .create<import('@/types/defesa-civil').RecordAttachment>(data as any)
+  },
   async upload(formData: FormData) {
     return pb
       .collection('record_attachments')
@@ -1078,5 +1083,284 @@ export const municipalGeoAdjustmentsService = {
     return pb
       .collection('municipal_geo_adjustments')
       .create<import('@/types/defesa-civil').MunicipalGeoAdjustment>(data)
+  },
+}
+
+// ----------------------------------------------------------------------
+// Urban Consultations Service (Desenvolvimento Urbano & Parcelamento de Solo)
+// ----------------------------------------------------------------------
+export const urbanConsultationsService = {
+  async list(filter?: string, sort = '-created') {
+    return pb
+      .collection('urban_consultations')
+      .getFullList<import('@/types/defesa-civil').UrbanConsultation>({
+        filter,
+        sort,
+        expand: 'created_by,municipality',
+        requestKey: null,
+      })
+  },
+  async get(id: string) {
+    return pb
+      .collection('urban_consultations')
+      .getOne<import('@/types/defesa-civil').UrbanConsultation>(id, {
+        expand: 'created_by,municipality',
+        requestKey: null,
+      })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').UrbanConsultation>) {
+    return pb
+      .collection('urban_consultations')
+      .create<import('@/types/defesa-civil').UrbanConsultation>(data)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').UrbanConsultation>) {
+    return pb
+      .collection('urban_consultations')
+      .update<import('@/types/defesa-civil').UrbanConsultation>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('urban_consultations').delete(id)
+  },
+}
+
+// ----------------------------------------------------------------------
+// Surveyed Families Service (Levantamento de Famílias e População Exposta)
+// ----------------------------------------------------------------------
+export const surveyedFamiliesService = {
+  async list(filter?: string, sort = 'family_internal_code') {
+    return pb
+      .collection('surveyed_families')
+      .getFullList<import('@/types/defesa-civil').SurveyedFamily>({
+        filter,
+        sort,
+        expand: 'created_by,municipality',
+        requestKey: null,
+      })
+  },
+  async get(id: string) {
+    return pb
+      .collection('surveyed_families')
+      .getOne<import('@/types/defesa-civil').SurveyedFamily>(id, {
+        expand: 'created_by,municipality',
+        requestKey: null,
+      })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').SurveyedFamily>) {
+    return pb
+      .collection('surveyed_families')
+      .create<import('@/types/defesa-civil').SurveyedFamily>(data)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').SurveyedFamily>) {
+    return pb
+      .collection('surveyed_families')
+      .update<import('@/types/defesa-civil').SurveyedFamily>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('surveyed_families').delete(id)
+  },
+}
+
+// ----------------------------------------------------------------------
+// Social Family Actions Service (Assistência Social)
+// ----------------------------------------------------------------------
+export const socialFamilyActionsService = {
+  async listForFamily(familyId: string) {
+    return pb
+      .collection('social_family_actions')
+      .getFullList<import('@/types/defesa-civil').SocialFamilyAction>({
+        filter: `family = "${familyId}"`,
+        sort: '-action_date',
+        expand: 'created_by',
+        requestKey: null,
+      })
+  },
+  async list(filter?: string, sort = '-action_date') {
+    return pb
+      .collection('social_family_actions')
+      .getFullList<import('@/types/defesa-civil').SocialFamilyAction>({
+        filter,
+        sort,
+        expand: 'family,created_by',
+        requestKey: null,
+      })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').SocialFamilyAction>) {
+    return pb
+      .collection('social_family_actions')
+      .create<import('@/types/defesa-civil').SocialFamilyAction>(data)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').SocialFamilyAction>) {
+    return pb
+      .collection('social_family_actions')
+      .update<import('@/types/defesa-civil').SocialFamilyAction>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('social_family_actions').delete(id)
+  },
+}
+
+// ----------------------------------------------------------------------
+// Health Operational Needs Service (Saúde - Necessidades de Apoio / Energia)
+// ----------------------------------------------------------------------
+export const healthOperationalNeedsService = {
+  async listForFamily(familyId: string) {
+    return pb
+      .collection('health_operational_needs')
+      .getFullList<import('@/types/defesa-civil').HealthOperationalNeed>({
+        filter: `family = "${familyId}"`,
+        sort: '-created',
+        expand: 'created_by',
+        requestKey: null,
+      })
+  },
+  async list(filter?: string, sort = '-created') {
+    return pb
+      .collection('health_operational_needs')
+      .getFullList<import('@/types/defesa-civil').HealthOperationalNeed>({
+        filter,
+        sort,
+        expand: 'family,created_by',
+        requestKey: null,
+      })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').HealthOperationalNeed>) {
+    return pb
+      .collection('health_operational_needs')
+      .create<import('@/types/defesa-civil').HealthOperationalNeed>(data)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').HealthOperationalNeed>) {
+    return pb
+      .collection('health_operational_needs')
+      .update<import('@/types/defesa-civil').HealthOperationalNeed>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('health_operational_needs').delete(id)
+  },
+}
+
+// ----------------------------------------------------------------------
+// Contingency Plans Service (Planos Municipais, Setoriais e por Cenário)
+// ----------------------------------------------------------------------
+export const contingencyPlansService = {
+  async list(filter?: string, sort = '-created') {
+    return pb
+      .collection('contingency_plans')
+      .getFullList<import('@/types/defesa-civil').ContingencyPlan>({
+        filter,
+        sort,
+        expand: 'created_by,municipality',
+        requestKey: null,
+      })
+  },
+  async get(id: string) {
+    return pb
+      .collection('contingency_plans')
+      .getOne<import('@/types/defesa-civil').ContingencyPlan>(id, {
+        expand: 'created_by,municipality',
+        requestKey: null,
+      })
+  },
+  async create(data: Partial<import('@/types/defesa-civil').ContingencyPlan>) {
+    return pb
+      .collection('contingency_plans')
+      .create<import('@/types/defesa-civil').ContingencyPlan>(data)
+  },
+  async update(id: string, data: Partial<import('@/types/defesa-civil').ContingencyPlan>) {
+    return pb
+      .collection('contingency_plans')
+      .update<import('@/types/defesa-civil').ContingencyPlan>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('contingency_plans').delete(id)
+  },
+}
+
+// ----------------------------------------------------------------------
+// Official References Library Service (Biblioteca Estadual / Federal)
+// ----------------------------------------------------------------------
+export const officialReferencesService = {
+  async list(filter?: string, sort = 'title') {
+    return pb
+      .collection('official_references_library')
+      .getFullList<import('@/types/defesa-civil').OfficialReferenceLibraryItem>({
+        filter,
+        sort,
+        expand: 'created_by',
+        requestKey: null,
+      })
+  },
+  async get(id: string) {
+    return pb
+      .collection('official_references_library')
+      .getOne<import('@/types/defesa-civil').OfficialReferenceLibraryItem>(id, {
+        expand: 'created_by',
+        requestKey: null,
+      })
+  },
+  async create(
+    data: FormData | Partial<import('@/types/defesa-civil').OfficialReferenceLibraryItem>,
+  ) {
+    return pb
+      .collection('official_references_library')
+      .create<import('@/types/defesa-civil').OfficialReferenceLibraryItem>(data as any)
+  },
+  async update(
+    id: string,
+    data: Partial<import('@/types/defesa-civil').OfficialReferenceLibraryItem>,
+  ) {
+    return pb
+      .collection('official_references_library')
+      .update<import('@/types/defesa-civil').OfficialReferenceLibraryItem>(id, data)
+  },
+  async delete(id: string) {
+    return pb.collection('official_references_library').delete(id)
+  },
+  getFileUrl(record: { id: string; document_file?: string }, filename?: string) {
+    if (!record || !record.document_file) return ''
+    return pb.files.getURL(record as any, filename || record.document_file)
+  },
+}
+
+// ----------------------------------------------------------------------
+// Sector Workspace Config Service (Configurações complementares por Secretaria)
+// ----------------------------------------------------------------------
+export const sectorWorkspaceConfigService = {
+  async list(filter?: string) {
+    return pb
+      .collection('sector_workspaces_config')
+      .getFullList<import('@/types/defesa-civil').SectorWorkspaceConfig>({
+        filter,
+        sort: 'department_title',
+        requestKey: null,
+      })
+  },
+  async getByDepartment(deptKey: string) {
+    try {
+      const records = await pb
+        .collection('sector_workspaces_config')
+        .getList<import('@/types/defesa-civil').SectorWorkspaceConfig>(1, 1, {
+          filter: `department_key = "${deptKey}"`,
+          requestKey: null,
+        })
+      return records.items[0] || null
+    } catch {
+      return null
+    }
+  },
+  async saveConfig(
+    data: Partial<import('@/types/defesa-civil').SectorWorkspaceConfig> & {
+      department_key: string
+      municipality: string
+    },
+  ) {
+    const existing = await this.getByDepartment(data.department_key)
+    if (existing) {
+      return pb
+        .collection('sector_workspaces_config')
+        .update<import('@/types/defesa-civil').SectorWorkspaceConfig>(existing.id, data)
+    }
+    return pb
+      .collection('sector_workspaces_config')
+      .create<import('@/types/defesa-civil').SectorWorkspaceConfig>(data)
   },
 }

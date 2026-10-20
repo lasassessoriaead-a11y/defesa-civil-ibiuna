@@ -22,6 +22,11 @@ import {
   X,
   Globe,
   Scale,
+  Route,
+  Bus,
+  Ambulance,
+  Truck,
+  HelpCircle,
 } from 'lucide-react'
 import { RecordAttachmentsTab } from '@/components/defesa-civil/RecordAttachmentsTab'
 import { getGoogleEarthUrl } from '@/lib/kml-export'
@@ -136,6 +141,23 @@ export const StrategicInfrastructuresPage: React.FC = () => {
   const [editDetailProblems, setEditDetailProblems] = useState('')
   const [isSavingDetailEdit, setIsSavingDetailEdit] = useState(false)
 
+  // Dependência e Risco de Isolamento (v0.0.35)
+  const [editCommunitiesServed, setEditCommunitiesServed] = useState('')
+  const [editFamiliesDependent, setEditFamiliesDependent] = useState<number | ''>('')
+  const [editPersonsDependent, setEditPersonsDependent] = useState<number | ''>('')
+  const [editMainRoute, setEditMainRoute] = useState('')
+  const [editHasAltAccess, setEditHasAltAccess] = useState<string>('ainda_nao_verificado')
+  const [editDetourRoute, setEditDetourRoute] = useState('')
+  const [editDetourDistanceKm, setEditDetourDistanceKm] = useState<number | ''>('')
+  const [editDetourTimeMin, setEditDetourTimeMin] = useState<number | ''>('')
+  const [editDetourMethod, setEditDetourMethod] = useState('')
+  const [editRainyCondition, setEditRainyCondition] = useState('')
+  const [editAmbulancePassable, setEditAmbulancePassable] = useState(true)
+  const [editSchoolBusPassable, setEditSchoolBusPassable] = useState(true)
+  const [editServiceTruckPassable, setEditServiceTruckPassable] = useState(true)
+  const [editKnownRestrictions, setEditKnownRestrictions] = useState('')
+  const [editIsolationPlan, setEditIsolationPlan] = useState('')
+
   // Painel de Conciliação 215 x 232
   const [isConciliationOpen, setIsConciliationOpen] = useState(false)
 
@@ -168,6 +190,22 @@ export const StrategicInfrastructuresPage: React.FC = () => {
       setEditDetailRefPoint(infra.reference_point || '')
       setEditDetailCondition(infra.structural_condition || 'nao_avaliado')
       setEditDetailProblems(infra.observed_problems || '')
+      // Preenchimento de dependência
+      setEditCommunitiesServed(infra.communities_served || '')
+      setEditFamiliesDependent(infra.families_dependent_count ?? '')
+      setEditPersonsDependent(infra.persons_dependent_count ?? '')
+      setEditMainRoute(infra.main_route_description || '')
+      setEditHasAltAccess(infra.has_alternative_access || 'ainda_nao_verificado')
+      setEditDetourRoute(infra.detour_route_description || '')
+      setEditDetourDistanceKm(infra.detour_distance_km ?? '')
+      setEditDetourTimeMin(infra.detour_time_minutes ?? '')
+      setEditDetourMethod(infra.detour_estimate_method || '')
+      setEditRainyCondition(infra.rainy_season_condition || '')
+      setEditAmbulancePassable(infra.ambulance_passable ?? true)
+      setEditSchoolBusPassable(infra.school_bus_passable ?? true)
+      setEditServiceTruckPassable(infra.service_truck_passable ?? true)
+      setEditKnownRestrictions(infra.known_restrictions || '')
+      setEditIsolationPlan(infra.isolation_contingency_plan || '')
       setIsDetailOpen(true)
       setIsLoadingDetails(true)
       setOpenedFromMap(fromMapSource)
@@ -317,6 +355,24 @@ export const StrategicInfrastructuresPage: React.FC = () => {
         reference_point: editDetailRefPoint.trim(),
         structural_condition: editDetailCondition as any,
         observed_problems: editDetailProblems.trim(),
+        communities_served: editCommunitiesServed.trim() || undefined,
+        families_dependent_count:
+          editFamiliesDependent !== '' ? Number(editFamiliesDependent) : undefined,
+        persons_dependent_count:
+          editPersonsDependent !== '' ? Number(editPersonsDependent) : undefined,
+        main_route_description: editMainRoute.trim() || undefined,
+        has_alternative_access: editHasAltAccess as any,
+        detour_route_description: editDetourRoute.trim() || undefined,
+        detour_distance_km: editDetourDistanceKm !== '' ? Number(editDetourDistanceKm) : undefined,
+        detour_time_minutes: editDetourTimeMin !== '' ? Number(editDetourTimeMin) : undefined,
+        detour_estimate_method: editDetourMethod.trim() || undefined,
+        detour_estimate_date: new Date().toISOString().slice(0, 10),
+        rainy_season_condition: editRainyCondition.trim() || undefined,
+        ambulance_passable: editAmbulancePassable,
+        school_bus_passable: editSchoolBusPassable,
+        service_truck_passable: editServiceTruckPassable,
+        known_restrictions: editKnownRestrictions.trim() || undefined,
+        isolation_contingency_plan: editIsolationPlan.trim() || undefined,
       }
 
       if (newLat !== undefined && newLon !== undefined) {
@@ -948,6 +1004,187 @@ export const StrategicInfrastructuresPage: React.FC = () => {
                     </div>
                   </div>
 
+                  {/* Edição da Dependência e Risco de Isolamento */}
+                  <div className="pt-2 border-t border-amber-200 space-y-3">
+                    <p className="font-bold text-amber-950 flex items-center gap-1.5">
+                      <Route className="w-4 h-4 text-amber-700" />
+                      Dependência Comunitária & Acesso Alternativo
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-800">
+                          Comunidades Atendidas
+                        </Label>
+                        <Input
+                          placeholder="Ex: Bairro Paruru, Morro Grande"
+                          value={editCommunitiesServed}
+                          onChange={(e) => setEditCommunitiesServed(e.target.value)}
+                          className="mt-1 text-xs bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-800">
+                          Famílias Dependentes
+                        </Label>
+                        <Input
+                          type="number"
+                          placeholder="Ex: 45"
+                          value={editFamiliesDependent}
+                          onChange={(e) =>
+                            setEditFamiliesDependent(
+                              e.target.value === '' ? '' : Number(e.target.value),
+                            )
+                          }
+                          className="mt-1 text-xs bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-800">
+                          Situação de Acesso Alternativo
+                        </Label>
+                        <Select value={editHasAltAccess} onValueChange={setEditHasAltAccess}>
+                          <SelectTrigger className="mt-1 text-xs bg-white h-8">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="acesso_alternativo_confirmado">
+                              Acesso alternativo confirmado
+                            </SelectItem>
+                            <SelectItem value="possivel_isolamento">Possível isolamento</SelectItem>
+                            <SelectItem value="sem_alternativa_identificada">
+                              Sem alternativa identificada
+                            </SelectItem>
+                            <SelectItem value="ainda_nao_verificado">
+                              Ainda não verificado
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-800">
+                          Rota Principal Utilizada
+                        </Label>
+                        <Input
+                          placeholder="Ex: Estrada Municipal KM 4"
+                          value={editMainRoute}
+                          onChange={(e) => setEditMainRoute(e.target.value)}
+                          className="mt-1 text-xs bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-800">
+                          Trajeto do Desvio / Acesso Alternativo
+                        </Label>
+                        <Input
+                          placeholder="Ex: Desvio pela Estrada do Feital (não utilizar linha reta)"
+                          value={editDetourRoute}
+                          onChange={(e) => setEditDetourRoute(e.target.value)}
+                          className="mt-1 text-xs bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-800">
+                          Distância Real de Percurso (km)
+                        </Label>
+                        <Input
+                          type="number"
+                          step="0.1"
+                          placeholder="Ex: 14.5"
+                          value={editDetourDistanceKm}
+                          onChange={(e) =>
+                            setEditDetourDistanceKm(
+                              e.target.value === '' ? '' : Number(e.target.value),
+                            )
+                          }
+                          className="mt-1 text-xs bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-800">
+                          Tempo Estimado (minutos)
+                        </Label>
+                        <Input
+                          type="number"
+                          placeholder="Ex: 35"
+                          value={editDetourTimeMin}
+                          onChange={(e) =>
+                            setEditDetourTimeMin(
+                              e.target.value === '' ? '' : Number(e.target.value),
+                            )
+                          }
+                          className="mt-1 text-xs bg-white"
+                        />
+                      </div>
+
+                      <div>
+                        <Label className="text-xs font-semibold text-slate-800">
+                          Método de Estimativa do Desvio
+                        </Label>
+                        <Input
+                          placeholder="Ex: Percurso aferido em campo pela equipe"
+                          value={editDetourMethod}
+                          onChange={(e) => setEditDetourMethod(e.target.value)}
+                          className="mt-1 text-xs bg-white"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-4 pt-1">
+                      <label className="flex items-center gap-1.5 cursor-pointer text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={editAmbulancePassable}
+                          onChange={(e) => setEditAmbulancePassable(e.target.checked)}
+                          className="rounded text-blue-600"
+                        />
+                        <span>Passagem de Ambulância no desvio</span>
+                      </label>
+
+                      <label className="flex items-center gap-1.5 cursor-pointer text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={editSchoolBusPassable}
+                          onChange={(e) => setEditSchoolBusPassable(e.target.checked)}
+                          className="rounded text-blue-600"
+                        />
+                        <span>Passagem de Transporte Escolar</span>
+                      </label>
+
+                      <label className="flex items-center gap-1.5 cursor-pointer text-slate-800">
+                        <input
+                          type="checkbox"
+                          checked={editServiceTruckPassable}
+                          onChange={(e) => setEditServiceTruckPassable(e.target.checked)}
+                          className="rounded text-blue-600"
+                        />
+                        <span>Caminhão de Serviço / Bombeiros</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <Label className="text-xs font-semibold text-slate-800">
+                        Providências em Caso de Interdição Total
+                      </Label>
+                      <Input
+                        placeholder="Ex: Ponto de apoio móvel no posto do Paruru e transbordo a pé..."
+                        value={editIsolationPlan}
+                        onChange={(e) => setEditIsolationPlan(e.target.value)}
+                        className="mt-1 text-xs bg-white"
+                      />
+                    </div>
+                  </div>
+
                   <div className="flex justify-end gap-2 pt-2 border-t border-amber-200">
                     <Button
                       size="sm"
@@ -1013,12 +1250,16 @@ export const StrategicInfrastructuresPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Abas da Ficha: Dados Gerais, Vistorias, Fotos & Documentos, Demandas & Ocorrências */}
+              {/* Abas da Ficha: Dados Gerais, Dependência & Isolamento, Vistorias, Fotos & Docs, Ocorrências */}
               <Tabs defaultValue="dados" className="w-full">
-                <TabsList className="grid w-full grid-cols-4 h-9">
+                <TabsList className="grid w-full grid-cols-5 h-9">
                   <TabsTrigger value="dados" className="text-xs">
                     <FileText className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
                     Dados Gerais
+                  </TabsTrigger>
+                  <TabsTrigger value="dependencia" className="text-xs font-semibold text-amber-700">
+                    <Route className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
+                    Isolamento & Acesso
                   </TabsTrigger>
                   <TabsTrigger value="vistorias" className="text-xs">
                     <ClipboardList className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
@@ -1026,14 +1267,13 @@ export const StrategicInfrastructuresPage: React.FC = () => {
                   </TabsTrigger>
                   <TabsTrigger value="fotos-docs" className="text-xs">
                     <Camera className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
-                    Fotos, Vídeos & Docs
+                    Fotos & Docs
                   </TabsTrigger>
                   <TabsTrigger value="ocorrencias" className="text-xs">
                     <AlertOctagon className="w-3.5 h-3.5 mr-1 hidden sm:inline" />
                     Ocorrências ({relatedOccurrences.length})
                   </TabsTrigger>
                 </TabsList>
-
                 {/* Aba 1: Dados Gerais */}
                 <TabsContent value="dados" className="space-y-3 pt-2 text-xs">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
@@ -1147,6 +1387,162 @@ export const StrategicInfrastructuresPage: React.FC = () => {
                   )}
                 </TabsContent>
 
+                {/* Aba Nova: Dependência & Risco de Isolamento Comunitário */}
+                <TabsContent value="dependencia" className="space-y-3 pt-2 text-xs">
+                  <div className="p-3.5 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-bold text-slate-900 flex items-center gap-1.5 text-xs">
+                        <Route className="w-4 h-4 text-blue-600" />
+                        Avaliação Operacional de Dependência e Isolamento
+                      </h4>
+                      <Badge
+                        className={`capitalize ${
+                          selectedInfra.has_alternative_access === 'acesso_alternativo_confirmado'
+                            ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                            : selectedInfra.has_alternative_access === 'possivel_isolamento'
+                              ? 'bg-red-50 text-red-700 border-red-200'
+                              : selectedInfra.has_alternative_access ===
+                                  'sem_alternativa_identificada'
+                                ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                : 'bg-slate-100 text-slate-600'
+                        }`}
+                      >
+                        {selectedInfra.has_alternative_access
+                          ? selectedInfra.has_alternative_access.replace(/_/g, ' ')
+                          : 'Ainda não verificado'}
+                      </Badge>
+                    </div>
+
+                    <p className="text-slate-600 leading-relaxed text-[11px]">
+                      Pergunta operacional:{' '}
+                      <em>
+                        "Se esta travessia for interditada, quem perde acesso e qual será a
+                        alternativa de atendimento?"
+                      </em>
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                      <span className="text-slate-500 block text-[11px]">
+                        Comunidades Atendidas:
+                      </span>
+                      <span className="font-semibold text-slate-800 text-sm">
+                        {selectedInfra.communities_served || 'Não informada'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                      <span className="text-slate-500 block text-[11px]">
+                        Famílias com Dependência:
+                      </span>
+                      <span className="font-semibold text-slate-800 text-sm">
+                        {selectedInfra.families_dependent_count !== undefined
+                          ? `${selectedInfra.families_dependent_count} famílias`
+                          : 'Pendente de levantamento'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                      <span className="text-slate-500 block text-[11px]">Rota Principal:</span>
+                      <span className="font-semibold text-slate-800 text-xs">
+                        {selectedInfra.main_route_description || 'Estrada municipal de acesso'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Desvio e Acesso Alternativo */}
+                  <div className="p-3 bg-white border border-slate-200 rounded-lg space-y-2">
+                    <h5 className="font-bold text-slate-800 flex items-center gap-1.5">
+                      <Route className="w-3.5 h-3.5 text-indigo-600" />
+                      Trajeto do Desvio & Acesso Alternativo
+                    </h5>
+
+                    {selectedInfra.detour_route_description ? (
+                      <p className="text-slate-700">{selectedInfra.detour_route_description}</p>
+                    ) : (
+                      <p className="text-amber-700 italic">Nenhum trajeto de desvio cadastrado.</p>
+                    )}
+
+                    <div className="grid grid-cols-3 gap-2 pt-1 border-t text-[11px]">
+                      <div>
+                        <span className="text-slate-500 block">Distância de Percurso:</span>
+                        <strong className="text-slate-800">
+                          {selectedInfra.detour_distance_km
+                            ? `${selectedInfra.detour_distance_km} km`
+                            : 'Não medida'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Tempo Estimado:</span>
+                        <strong className="text-slate-800">
+                          {selectedInfra.detour_time_minutes
+                            ? `${selectedInfra.detour_time_minutes} min`
+                            : 'Não estimado'}
+                        </strong>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block">Método de Estimativa:</span>
+                        <span className="text-slate-700">
+                          {selectedInfra.detour_estimate_method || 'Aferição em campo'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Condições de Passagem de Serviços Emergenciais */}
+                  <div className="p-3 bg-slate-50 rounded-lg border border-slate-200 space-y-2">
+                    <h5 className="font-bold text-slate-800">
+                      Passagem de Veículos de Emergência no Desvio:
+                    </h5>
+                    <div className="flex flex-wrap gap-3">
+                      <Badge
+                        variant="outline"
+                        className={
+                          selectedInfra.ambulance_passable
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-red-50 text-red-800 border-red-200'
+                        }
+                      >
+                        <Ambulance className="w-3 h-3 mr-1" />
+                        Ambulância: {selectedInfra.ambulance_passable ? 'Passa' : 'Não passa'}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={
+                          selectedInfra.school_bus_passable
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-red-50 text-red-800 border-red-200'
+                        }
+                      >
+                        <Bus className="w-3 h-3 mr-1" />
+                        Transporte Escolar:{' '}
+                        {selectedInfra.school_bus_passable ? 'Passa' : 'Não passa'}
+                      </Badge>
+                      <Badge
+                        variant="outline"
+                        className={
+                          selectedInfra.service_truck_passable
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                            : 'bg-red-50 text-red-800 border-red-200'
+                        }
+                      >
+                        <Truck className="w-3 h-3 mr-1" />
+                        Caminhão / Bombeiros:{' '}
+                        {selectedInfra.service_truck_passable ? 'Passa' : 'Não passa'}
+                      </Badge>
+                    </div>
+
+                    {selectedInfra.isolation_contingency_plan && (
+                      <div className="pt-1">
+                        <span className="text-slate-500 block text-[11px]">
+                          Plano Operacional em Interdição:
+                        </span>
+                        <p className="text-slate-800 font-medium">
+                          {selectedInfra.isolation_contingency_plan}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </TabsContent>
                 {/* Aba 2: Vistorias Técnicas */}
                 <TabsContent value="vistorias" className="space-y-3 pt-2 text-xs">
                   <div className="flex items-center justify-between">
