@@ -46,6 +46,13 @@ import type {
 } from '@/types/defesa-civil'
 import { SeverityBadge, getHazardIcon } from './StatusBadges'
 
+// Cache em memória compartilhado entre montagens do InteractiveMap
+// Evita re-buscar geo_layers, risk_sectors e danger_stretches repetidamente
+let cachedGeoLayers: any[] | null = null
+let cachedGeoRiskSectors: any[] | null = null
+let cachedGeoDangerStretches: any[] | null = null
+let geoFetchPromise: Promise<[any[], any[], any[]]> | null = null
+
 // Helper to construct modern custom HTML markers with DivIcon
 function createDivIcon(
   html: string,
@@ -581,43 +588,78 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
 
   const navigate = useNavigate()
 
-  // Carregamento resiliente das geometrias vinculadas do banco
+  // Carregamento resiliente das geometrias vinculadas do banco com cache em memória
   useEffect(() => {
     let isMounted = true
+
+    // Se já temos cache em memória preenchido, usa imediatamente (zero latência)
+    if (
+      cachedGeoLayers !== null &&
+      cachedGeoRiskSectors !== null &&
+      cachedGeoDangerStretches !== null
+    ) {
+      setLoadedGeoLayers(cachedGeoLayers)
+      setGeoRiskSectors(cachedGeoRiskSectors)
+      setGeoDangerStretches(cachedGeoDangerStretches)
+      return
+    }
+
     async function fetchGeometries() {
+      if (geoFetchPromise) {
+        try {
+          const [layersRes, sectorsRes, stretchesRes] = await geoFetchPromise
+          if (isMounted) {
+            setLoadedGeoLayers(layersRes || [])
+            setGeoRiskSectors(sectorsRes || [])
+            setGeoDangerStretches(stretchesRes || [])
+          }
+        } catch {
+          /* intentionally ignored */
+        }
+        return
+      }
+
+      geoFetchPromise = Promise.all([
+        pb
+          ?.collection('geo_layers')
+          ?.getFullList({ batch: 1000, requestKey: null })
+          .catch(() => []) || Promise.resolve([]),
+        pb
+          ?.collection('risk_sectors')
+          ?.getFullList({
+            filter: 'geometry_geojson != ""',
+            batch: 500,
+            requestKey: null,
+          })
+          .catch(() => []) || Promise.resolve([]),
+        pb
+          ?.collection('danger_stretches')
+          ?.getFullList({
+            filter: 'geometry_geojson != ""',
+            batch: 500,
+            requestKey: null,
+          })
+          .catch(() => []) || Promise.resolve([]),
+      ])
+
       try {
-        const [layersRes, sectorsRes, stretchesRes] = await Promise.all([
-          pb
-            ?.collection('geo_layers')
-            ?.getFullList({ batch: 1000, requestKey: null })
-            .catch(() => []) || [],
-          pb
-            ?.collection('risk_sectors')
-            ?.getFullList({
-              filter: 'geometry_geojson != ""',
-              batch: 500,
-              requestKey: null,
-            })
-            .catch(() => []) || [],
-          pb
-            ?.collection('danger_stretches')
-            ?.getFullList({
-              filter: 'geometry_geojson != ""',
-              batch: 500,
-              requestKey: null,
-            })
-            .catch(() => []) || [],
-        ])
+        const [layersRes, sectorsRes, stretchesRes] = await geoFetchPromise
+        cachedGeoLayers = layersRes || []
+        cachedGeoRiskSectors = sectorsRes || []
+        cachedGeoDangerStretches = stretchesRes || []
 
         if (isMounted) {
-          setLoadedGeoLayers(layersRes || [])
-          setGeoRiskSectors(sectorsRes || [])
-          setGeoDangerStretches(stretchesRes || [])
+          setLoadedGeoLayers(cachedGeoLayers)
+          setGeoRiskSectors(cachedGeoRiskSectors)
+          setGeoDangerStretches(cachedGeoDangerStretches)
         }
       } catch {
         /* intentionally ignored */
+      } finally {
+        geoFetchPromise = null
       }
     }
+
     fetchGeometries()
     return () => {
       isMounted = false
@@ -694,71 +736,336 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
       className="relative w-full rounded-xl overflow-hidden border border-slate-300 shadow-inner bg-slate-100 group"
       style={{ height }}
     >
-      {/* Barra superior de Controles de Base e Integrações (Mapa | Satélite | Híbrido + Google Earth / KML) */}
-      <div className="absolute top-2 left-2 z-[400] flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md p-1 rounded-lg border border-slate-300 shadow-md">
-        {/* Seletor de Base de Visualização */}
-        <div className="flex items-center rounded-md bg-slate-100 p-0.5 border border-slate-200">
-          <button
-            type="button"
-            onClick={() => handleBaseMapChange('map')}
-            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
-              baseMapMode === 'map'
-                ? 'bg-white text-slate-900 shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Mapa
-          </button>
-          <button
-            type="button"
-            onClick={() => handleBaseMapChange('satellite')}
-            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
-              baseMapMode === 'satellite'
-                ? 'bg-blue-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Satélite
-          </button>
-          <button
-            type="button"
-            onClick={() => handleBaseMapChange('hybrid')}
-            className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
-              baseMapMode === 'hybrid'
-                ? 'bg-indigo-600 text-white shadow-xs'
-                : 'text-slate-600 hover:text-slate-900'
-            }`}
-          >
-            Híbrido
-          </button>
+      {/* Barra superior de controles sobre o mapa: layout em fluxo flex-col com gap, impedindo qualquer sobreposição entre base e chips */}
+      <div className="absolute top-2 left-2 right-12 z-[400] flex flex-col items-start gap-1.5 pointer-events-none">
+        {/* Linha 1: Controles de Base (Mapa | Satélite | Híbrido) e Integrações (Google Earth / KML) */}
+        <div className="flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md p-1 rounded-lg border border-slate-300 shadow-md pointer-events-auto max-w-full">
+          {/* Seletor de Base de Visualização */}
+          <div className="flex items-center rounded-md bg-slate-100 p-0.5 border border-slate-200">
+            <button
+              type="button"
+              onClick={() => handleBaseMapChange('map')}
+              className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+                baseMapMode === 'map'
+                  ? 'bg-white text-slate-900 shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Mapa
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBaseMapChange('satellite')}
+              className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+                baseMapMode === 'satellite'
+                  ? 'bg-blue-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Satélite
+            </button>
+            <button
+              type="button"
+              onClick={() => handleBaseMapChange('hybrid')}
+              className={`px-2 py-0.5 rounded text-[11px] font-semibold transition-all ${
+                baseMapMode === 'hybrid'
+                  ? 'bg-indigo-600 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              Híbrido
+            </button>
+          </div>
+
+          {/* Integração Google Earth KML */}
+          <div className="flex items-center gap-1 border-l border-slate-200 pl-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={handleExportKml}
+              className="h-6 px-2 text-[11px] font-medium text-slate-700 bg-white hover:bg-slate-50 border-slate-300 flex items-center gap-1"
+              title="Exportar camadas visíveis em formato KML/KMZ para Google Earth. Nota: Não sincroniza automaticamente edições com o sistema."
+            >
+              <Download className="w-3 h-3 text-slate-600" />
+              <span className="hidden sm:inline">Exportar KML</span>
+              <span className="sm:hidden">KML</span>
+            </Button>
+
+            <a
+              href={getGoogleEarthUrl(validCenter[0], validCenter[1])}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-6 px-2 text-[11px] font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-md flex items-center gap-1 transition-colors"
+              title="Abrir o centro atual no Google Earth Web. Nota: Não sincroniza automaticamente edições."
+            >
+              <Globe className="w-3 h-3 text-blue-600" />
+              <span className="hidden md:inline">Google Earth</span>
+              <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
+            </a>
+          </div>
         </div>
 
-        {/* Integração Google Earth KML */}
-        <div className="flex items-center gap-1 border-l border-slate-200 pl-1.5">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleExportKml}
-            className="h-6 px-2 text-[11px] font-medium text-slate-700 bg-white hover:bg-slate-50 border-slate-300 flex items-center gap-1"
-            title="Exportar camadas visíveis em formato KML/KMZ para Google Earth. Nota: Não sincroniza automaticamente edições com o sistema."
-          >
-            <Download className="w-3 h-3 text-slate-600" />
-            Exportar KML
-          </Button>
+        {/* Linha 2: Chips de Camadas e Filtros Integrados (Ocorrências, Pontes/Aduelas, IPT, etc) organizados com flex-wrap sem sobreposição */}
+        {showLayerToggles && (
+          <div className="flex flex-wrap items-center gap-1.5 pointer-events-auto max-w-full">
+            <div className="flex flex-wrap items-center gap-1 bg-white/95 backdrop-blur-md p-1 rounded-lg border border-slate-300 shadow-md">
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowOccurrences(!showOccurrences)}
+                className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                  showOccurrences
+                    ? 'bg-red-100 text-red-700 border border-red-200'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <AlertOctagon className="w-3.5 h-3.5 mr-1 text-red-600 shrink-0" />
+                <span>Ocorrências ({occurrences.length})</span>
+              </Button>
 
-          <a
-            href={getGoogleEarthUrl(validCenter[0], validCenter[1])}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="h-6 px-2 text-[11px] font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 rounded-md flex items-center gap-1 transition-colors"
-            title="Abrir o centro atual no Google Earth Web. Nota: Não sincroniza automaticamente edições."
-          >
-            <Globe className="w-3 h-3 text-blue-600" />
-            <span className="hidden md:inline">Google Earth</span>
-            <ExternalLink className="w-2.5 h-2.5 text-slate-400" />
-          </a>
-        </div>
+              {/* Camada 1: Pontes e Aduelas — Levantamento Municipal (pontos) */}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowInfrastructures(!showInfrastructures)}
+                className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                  showInfrastructures
+                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+                title="Pontes e Aduelas — Levantamento Municipal (camada independente)"
+              >
+                <Building2 className="w-3.5 h-3.5 mr-1 text-emerald-600 shrink-0" />
+                <span className="hidden md:inline">Pontes e Aduelas — Levantamento Municipal</span>
+                <span className="md:hidden">Pontes/Aduelas</span> (
+                {strategicInfrastructures.filter((i) => i.latitude && i.longitude).length})
+              </Button>
+
+              {/* Camada 2: Setores de Risco — IPT (Polígonos) */}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowRiskSectorsGeo(!showRiskSectorsGeo)}
+                className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                  showRiskSectorsGeo
+                    ? 'bg-orange-100 text-orange-800 border border-orange-300'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+                title="Setores de Risco — IPT (Polígonos independentes)"
+              >
+                <Layers className="w-3.5 h-3.5 mr-1 text-orange-600 shrink-0" />
+                <span className="hidden md:inline">Setores de Risco — IPT</span>
+                <span className="md:hidden">Setores IPT</span> (
+                {geoRiskSectors.length > 0
+                  ? geoRiskSectors.length
+                  : loadedGeoLayers.filter(
+                      (l) =>
+                        l.layer_type === 'setores_risco' ||
+                        l.layer_name === 'Setores de Risco — IPT' ||
+                        l.layer_type === 'areas_avaliacao_risco',
+                    ).length}
+                )
+              </Button>
+
+              {/* Camada 3: Trechos de Enxurrada — IPT (Linhas, kind=trecho / process=ENX) */}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowDangerStretchesGeo(!showDangerStretchesGeo)}
+                className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                  showDangerStretchesGeo
+                    ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+                title="Trechos de Enxurrada — IPT (Linhas, process=ENX)"
+              >
+                <Navigation className="w-3.5 h-3.5 mr-1 text-blue-600 shrink-0" />
+                <span className="hidden md:inline">Trechos de Enxurrada — IPT</span>
+                <span className="md:hidden">Trechos ENX</span> (
+                {geoDangerStretches.length > 0
+                  ? geoDangerStretches.length
+                  : loadedGeoLayers.filter(
+                      (l) =>
+                        l.layer_type === 'trechos_perigo' ||
+                        l.layer_name === 'Trechos de Enxurrada — IPT',
+                    ).length}
+                )
+              </Button>
+
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowAreas(!showAreas)}
+                className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                  showAreas
+                    ? 'bg-amber-100 text-amber-800 border border-amber-200'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <Layers className="w-3.5 h-3.5 mr-1 text-amber-600 shrink-0" />
+                <span>Áreas ({areas.length})</span>
+              </Button>
+
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowShelters(!showShelters)}
+                className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                  showShelters
+                    ? 'bg-blue-100 text-blue-800 border border-blue-200'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5 mr-1 text-blue-600 shrink-0" />
+                <span>Abrigos ({shelters.length})</span>
+              </Button>
+
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowTeams(!showTeams)}
+                className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                  showTeams
+                    ? 'bg-purple-100 text-purple-800 border border-purple-200'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5 mr-1 text-purple-600 shrink-0" />
+                <span>Equipes ({teams.length})</span>
+              </Button>
+
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowInundationGeo(!showInundationGeo)}
+                className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                  showInundationGeo
+                    ? 'bg-sky-100 text-sky-800 border border-sky-300'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Inundação (
+                {loadedGeoLayers.filter((l) => l.layer_type === 'areas_inundacao').length})
+              </Button>
+
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowHydroGeo(!showHydroGeo)}
+                className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                  showHydroGeo
+                    ? 'bg-blue-100 text-blue-800 border border-blue-300'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Hidrografia (
+                {loadedGeoLayers.filter((l) => l.layer_type === 'hidro_principal').length})
+              </Button>
+
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setShowContoursGeo(!showContoursGeo)}
+                className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
+                  showContoursGeo
+                    ? 'bg-stone-200 text-stone-800 border border-stone-400'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Curvas de Nível
+              </Button>
+            </div>
+
+            {/* Filtros Integrados IPT: Tipo (Setor/Trecho), Localidade e Grau de Risco */}
+            <div className="flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md px-2 py-1 rounded-lg border border-slate-300 shadow-md text-xs">
+              {/* Tipo */}
+              <div className="flex items-center gap-1 mr-1">
+                <span className="font-semibold text-slate-600 text-[11px]">Tipo:</span>
+                <button
+                  type="button"
+                  onClick={() => setTypeFilter('all')}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                    typeFilter === 'all'
+                      ? 'bg-slate-800 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTypeFilter('setor')}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                    typeFilter === 'setor'
+                      ? 'bg-orange-600 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  Setores
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTypeFilter('trecho')}
+                  className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                    typeFilter === 'trecho'
+                      ? 'bg-blue-600 text-white'
+                      : 'text-slate-600 hover:bg-slate-100'
+                  }`}
+                >
+                  Trechos
+                </button>
+              </div>
+
+              {/* Filtro R1-R4 / P1-P4 */}
+              <div className="flex items-center gap-1 mr-1 border-l border-slate-200 pl-1.5">
+                <span className="font-semibold text-slate-600 text-[11px]">Grau:</span>
+                {(['all', 'R4', 'R3', 'R2', 'R1'] as const).map((r) => (
+                  <button
+                    key={r}
+                    type="button"
+                    onClick={() => setRiskFilter(r)}
+                    className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
+                      riskFilter === r
+                        ? r === 'R4'
+                          ? 'bg-red-600 text-white'
+                          : r === 'R3'
+                            ? 'bg-orange-500 text-white'
+                            : r === 'R2'
+                              ? 'bg-amber-500 text-white'
+                              : r === 'R1'
+                                ? 'bg-emerald-600 text-white'
+                                : 'bg-slate-800 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {r === 'all' ? 'Todos' : r}
+                  </button>
+                ))}
+              </div>
+
+              {/* Localidade (select compacto) */}
+              {availableLocalities.length > 0 && (
+                <div className="flex items-center gap-1 border-l border-slate-200 pl-1.5">
+                  <span className="font-semibold text-slate-600 text-[11px]">Localidade:</span>
+                  <select
+                    value={localityFilter}
+                    onChange={(e) => setLocalityFilter(e.target.value)}
+                    className="text-[11px] bg-slate-50 border border-slate-300 rounded px-1.5 py-0.5 max-w-[130px] truncate text-slate-700"
+                  >
+                    <option value="all">Todas ({availableLocalities.length})</option>
+                    {availableLocalities.map((loc) => (
+                      <option key={loc} value={loc}>
+                        {loc}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
+
       {/* Real Interactive Leaflet OpenStreetMap */}
       <MapContainer
         center={validCenter}
@@ -1709,262 +2016,6 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
             />
           )}
       </MapContainer>
-
-      {/* Floating Layer Filter Chips */}
-      {showLayerToggles && (
-        <div className="absolute top-3 left-3 flex flex-wrap items-center gap-1.5 z-[400] pointer-events-auto">
-          <div className="flex items-center gap-1 bg-white/95 backdrop-blur-md p-1 rounded-lg border border-slate-300 shadow-md">
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowOccurrences(!showOccurrences)}
-              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
-                showOccurrences
-                  ? 'bg-red-100 text-red-700 border border-red-200'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <AlertOctagon className="w-3.5 h-3.5 mr-1 text-red-600" />
-              Ocorrências ({occurrences.length})
-            </Button>
-
-            {/* Camada 1: Pontes e Aduelas — Levantamento Municipal (pontos) */}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowInfrastructures(!showInfrastructures)}
-              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
-                showInfrastructures
-                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-              title="Pontes e Aduelas — Levantamento Municipal (camada independente)"
-            >
-              <Building2 className="w-3.5 h-3.5 mr-1 text-emerald-600" />
-              Pontes e Aduelas — Levantamento Municipal (
-              {strategicInfrastructures.filter((i) => i.latitude && i.longitude).length})
-            </Button>
-
-            {/* Camada 2: Setores de Risco — IPT (Polígonos) */}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowRiskSectorsGeo(!showRiskSectorsGeo)}
-              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
-                showRiskSectorsGeo
-                  ? 'bg-orange-100 text-orange-800 border border-orange-300'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-              title="Setores de Risco — IPT (Polígonos independentes)"
-            >
-              <Layers className="w-3.5 h-3.5 mr-1 text-orange-600" />
-              Setores de Risco — IPT (
-              {geoRiskSectors.length > 0
-                ? geoRiskSectors.length
-                : loadedGeoLayers.filter(
-                    (l) =>
-                      l.layer_type === 'setores_risco' ||
-                      l.layer_name === 'Setores de Risco — IPT' ||
-                      l.layer_type === 'areas_avaliacao_risco',
-                  ).length}
-              )
-            </Button>
-
-            {/* Camada 3: Trechos de Enxurrada — IPT (Linhas, kind=trecho / process=ENX) */}
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowDangerStretchesGeo(!showDangerStretchesGeo)}
-              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
-                showDangerStretchesGeo
-                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-              title="Trechos de Enxurrada — IPT (Linhas, process=ENX)"
-            >
-              <Navigation className="w-3.5 h-3.5 mr-1 text-blue-600" />
-              Trechos de Enxurrada — IPT (
-              {geoDangerStretches.length > 0
-                ? geoDangerStretches.length
-                : loadedGeoLayers.filter(
-                    (l) =>
-                      l.layer_type === 'trechos_perigo' ||
-                      l.layer_name === 'Trechos de Enxurrada — IPT',
-                  ).length}
-              )
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowAreas(!showAreas)}
-              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
-                showAreas
-                  ? 'bg-amber-100 text-amber-800 border border-amber-200'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <Layers className="w-3.5 h-3.5 mr-1 text-amber-600" />
-              Áreas ({areas.length})
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowShelters(!showShelters)}
-              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
-                showShelters
-                  ? 'bg-blue-100 text-blue-800 border border-blue-200'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <Building2 className="w-3.5 h-3.5 mr-1 text-blue-600" />
-              Abrigos ({shelters.length})
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowTeams(!showTeams)}
-              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
-                showTeams
-                  ? 'bg-purple-100 text-purple-800 border border-purple-200'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <Users className="w-3.5 h-3.5 mr-1 text-purple-600" />
-              Equipes ({teams.length})
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowInundationGeo(!showInundationGeo)}
-              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
-                showInundationGeo
-                  ? 'bg-sky-100 text-sky-800 border border-sky-300'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              Inundação ({loadedGeoLayers.filter((l) => l.layer_type === 'areas_inundacao').length})
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowHydroGeo(!showHydroGeo)}
-              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
-                showHydroGeo
-                  ? 'bg-blue-100 text-blue-800 border border-blue-300'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              Hidrografia (
-              {loadedGeoLayers.filter((l) => l.layer_type === 'hidro_principal').length})
-            </Button>
-
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowContoursGeo(!showContoursGeo)}
-              className={`h-7 px-2 text-xs font-semibold rounded-md transition-all ${
-                showContoursGeo
-                  ? 'bg-stone-200 text-stone-800 border border-stone-400'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              Curvas de Nível
-            </Button>
-          </div>
-
-          {/* Filtros Integrados IPT: Tipo (Setor/Trecho), Localidade e Grau de Risco */}
-          <div className="flex flex-wrap items-center gap-1.5 bg-white/95 backdrop-blur-md px-2 py-1 rounded-lg border border-slate-300 shadow-md text-xs">
-            {/* Tipo */}
-            <div className="flex items-center gap-1 mr-1">
-              <span className="font-semibold text-slate-600 text-[11px]">Tipo:</span>
-              <button
-                type="button"
-                onClick={() => setTypeFilter('all')}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all ${
-                  typeFilter === 'all'
-                    ? 'bg-slate-800 text-white'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                Todos
-              </button>
-              <button
-                type="button"
-                onClick={() => setTypeFilter('setor')}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all ${
-                  typeFilter === 'setor'
-                    ? 'bg-orange-600 text-white'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                Setores
-              </button>
-              <button
-                type="button"
-                onClick={() => setTypeFilter('trecho')}
-                className={`px-1.5 py-0.5 rounded text-[10px] font-semibold transition-all ${
-                  typeFilter === 'trecho'
-                    ? 'bg-blue-600 text-white'
-                    : 'text-slate-600 hover:bg-slate-100'
-                }`}
-              >
-                Trechos
-              </button>
-            </div>
-
-            {/* Filtro R1-R4 / P1-P4 */}
-            <div className="flex items-center gap-1 mr-1 border-l border-slate-200 pl-1.5">
-              <span className="font-semibold text-slate-600 text-[11px]">Grau:</span>
-              {(['all', 'R4', 'R3', 'R2', 'R1'] as const).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  onClick={() => setRiskFilter(r)}
-                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold transition-all ${
-                    riskFilter === r
-                      ? r === 'R4'
-                        ? 'bg-red-600 text-white'
-                        : r === 'R3'
-                          ? 'bg-orange-500 text-white'
-                          : r === 'R2'
-                            ? 'bg-amber-500 text-white'
-                            : r === 'R1'
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-slate-800 text-white'
-                      : 'text-slate-600 hover:bg-slate-100'
-                  }`}
-                >
-                  {r === 'all' ? 'Todos' : r}
-                </button>
-              ))}
-            </div>
-
-            {/* Localidade (select compacto) */}
-            {availableLocalities.length > 0 && (
-              <div className="flex items-center gap-1 border-l border-slate-200 pl-1.5">
-                <span className="font-semibold text-slate-600 text-[11px]">Localidade:</span>
-                <select
-                  value={localityFilter}
-                  onChange={(e) => setLocalityFilter(e.target.value)}
-                  className="text-[11px] bg-slate-50 border border-slate-300 rounded px-1.5 py-0.5 max-w-[130px] truncate text-slate-700"
-                >
-                  <option value="all">Todas ({availableLocalities.length})</option>
-                  {availableLocalities.map((loc) => (
-                    <option key={loc} value={loc}>
-                      {loc}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* Legenda Oficial Completa de Camadas */}
       <div className="absolute bottom-2 right-2 hidden sm:flex items-center gap-3 bg-white/95 backdrop-blur-md px-3 py-1.5 rounded-md border border-slate-300 text-[10px] text-slate-700 shadow-md z-[400] font-medium">
