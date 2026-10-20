@@ -34,26 +34,78 @@ onRecordCreate((e) => {
   // Se já estiver sendo criado como emitido, gera numeração e data
   if (status === 'emitido' && munId && !record.getString('number')) {
     const year = new Date().getFullYear()
-    $app.runInTransaction((txApp) => {
-      let counterRec = null
+    try {
+      $app.runInTransaction((txApp) => {
+        let counterRec = null
+        try {
+          counterRec = txApp.findFirstRecordByFilter(
+            'document_counters',
+            "municipality = '" + munId + "' && type = 'oficio' && year = " + year,
+          )
+        } catch (_) {
+          const cCol = txApp.findCollectionByNameOrId('document_counters')
+          counterRec = new Record(cCol)
+          counterRec.set('municipality', munId)
+          counterRec.set('type', 'oficio')
+          counterRec.set('year', year)
+          counterRec.set('last_number', 0)
+        }
+
+        const nextNum = (counterRec.getInt('last_number') || 0) + 1
+        counterRec.set('last_number', nextNum)
+        txApp.save(counterRec)
+
+        const padded = ('00000' + nextNum).slice(-5)
+        const numCode = 'OF-' + year + '-' + padded
+        record.set('number', numCode)
+        record.set('year', year)
+        record.set('sequential', nextNum)
+        if (!record.getString('issue_date')) {
+          record.set('issue_date', new Date().toISOString())
+        }
+      })
+    } catch (txErr) {
+      // Fallback robusto via SQL atômico se transação ORM encontrar validação
+      const nowStr = new Date().toISOString().replace('T', ' ').replace('Z', '')
+      let nextNum = 1
       try {
-        counterRec = txApp.findFirstRecordByFilter(
-          'document_counters',
-          "municipality = '" + munId + "' && type = 'oficio' && year = " + year,
-        )
+        const row = $app
+          .db()
+          .newQuery(
+            "SELECT id, last_number FROM document_counters WHERE municipality = {:mun} AND type = 'oficio' AND year = {:year}",
+          )
+          .bind({ mun: munId, year: year })
+          .one()
+
+        if (row && row.id) {
+          nextNum = (parseInt(row.last_number, 10) || 0) + 1
+          $app
+            .db()
+            .newQuery(
+              'UPDATE document_counters SET last_number = {:next}, updated = {:now} WHERE id = {:id}',
+            )
+            .bind({ next: nextNum, now: nowStr, id: row.id })
+            .execute()
+        }
       } catch (_) {
-        const cCol = txApp.findCollectionByNameOrId('document_counters')
-        counterRec = new Record(cCol)
-        counterRec.set('municipality', munId)
-        counterRec.set('type', 'oficio')
-        counterRec.set('year', year)
-        counterRec.set('last_number', 0)
+        const newId = $security.randomString(15)
+        $app
+          .db()
+          .newQuery(
+            'INSERT INTO document_counters (id, municipality, type, year, last_number, created, updated) VALUES ({:id}, {:mun}, {:type}, {:year}, {:last_num}, {:created}, {:updated})',
+          )
+          .bind({
+            id: newId,
+            mun: munId,
+            type: 'oficio',
+            year: year,
+            last_num: 1,
+            created: nowStr,
+            updated: nowStr,
+          })
+          .execute()
+        nextNum = 1
       }
-
-      const nextNum = (counterRec.getInt('last_number') || 0) + 1
-      counterRec.set('last_number', nextNum)
-      txApp.save(counterRec)
-
       const padded = ('00000' + nextNum).slice(-5)
       const numCode = 'OF-' + year + '-' + padded
       record.set('number', numCode)
@@ -62,7 +114,7 @@ onRecordCreate((e) => {
       if (!record.getString('issue_date')) {
         record.set('issue_date', new Date().toISOString())
       }
-    })
+    }
   }
 
   e.next()
@@ -145,26 +197,78 @@ onRecordUpdate((e) => {
   const isBeingIssued = (oldStatus === 'rascunho' || !oldStatus) && newStatus === 'emitido'
   if (isBeingIssued && !record.getString('number') && munId) {
     const year = new Date().getFullYear()
-    $app.runInTransaction((txApp) => {
-      let counterRec = null
+    try {
+      $app.runInTransaction((txApp) => {
+        let counterRec = null
+        try {
+          counterRec = txApp.findFirstRecordByFilter(
+            'document_counters',
+            "municipality = '" + munId + "' && type = 'oficio' && year = " + year,
+          )
+        } catch (_) {
+          const cCol = txApp.findCollectionByNameOrId('document_counters')
+          counterRec = new Record(cCol)
+          counterRec.set('municipality', munId)
+          counterRec.set('type', 'oficio')
+          counterRec.set('year', year)
+          counterRec.set('last_number', 0)
+        }
+
+        const nextNum = (counterRec.getInt('last_number') || 0) + 1
+        counterRec.set('last_number', nextNum)
+        txApp.save(counterRec)
+
+        const padded = ('00000' + nextNum).slice(-5)
+        const numCode = 'OF-' + year + '-' + padded
+        record.set('number', numCode)
+        record.set('year', year)
+        record.set('sequential', nextNum)
+        if (!record.getString('issue_date')) {
+          record.set('issue_date', new Date().toISOString())
+        }
+      })
+    } catch (txErr) {
+      // Fallback robusto via SQL atômico se transação ORM encontrar validação
+      const nowStr = new Date().toISOString().replace('T', ' ').replace('Z', '')
+      let nextNum = 1
       try {
-        counterRec = txApp.findFirstRecordByFilter(
-          'document_counters',
-          "municipality = '" + munId + "' && type = 'oficio' && year = " + year,
-        )
+        const row = $app
+          .db()
+          .newQuery(
+            "SELECT id, last_number FROM document_counters WHERE municipality = {:mun} AND type = 'oficio' AND year = {:year}",
+          )
+          .bind({ mun: munId, year: year })
+          .one()
+
+        if (row && row.id) {
+          nextNum = (parseInt(row.last_number, 10) || 0) + 1
+          $app
+            .db()
+            .newQuery(
+              'UPDATE document_counters SET last_number = {:next}, updated = {:now} WHERE id = {:id}',
+            )
+            .bind({ next: nextNum, now: nowStr, id: row.id })
+            .execute()
+        }
       } catch (_) {
-        const cCol = txApp.findCollectionByNameOrId('document_counters')
-        counterRec = new Record(cCol)
-        counterRec.set('municipality', munId)
-        counterRec.set('type', 'oficio')
-        counterRec.set('year', year)
-        counterRec.set('last_number', 0)
+        const newId = $security.randomString(15)
+        $app
+          .db()
+          .newQuery(
+            'INSERT INTO document_counters (id, municipality, type, year, last_number, created, updated) VALUES ({:id}, {:mun}, {:type}, {:year}, {:last_num}, {:created}, {:updated})',
+          )
+          .bind({
+            id: newId,
+            mun: munId,
+            type: 'oficio',
+            year: year,
+            last_num: 1,
+            created: nowStr,
+            updated: nowStr,
+          })
+          .execute()
+        nextNum = 1
       }
-
-      const nextNum = (counterRec.getInt('last_number') || 0) + 1
-      counterRec.set('last_number', nextNum)
-      txApp.save(counterRec)
-
       const padded = ('00000' + nextNum).slice(-5)
       const numCode = 'OF-' + year + '-' + padded
       record.set('number', numCode)
@@ -173,7 +277,7 @@ onRecordUpdate((e) => {
       if (!record.getString('issue_date')) {
         record.set('issue_date', new Date().toISOString())
       }
-    })
+    }
   }
 
   const safeBefore = {

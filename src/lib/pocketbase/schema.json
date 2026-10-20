@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-20T15:14:13.318Z",
+  "generatedAt": "2026-10-20T19:17:16.637Z",
   "collections": [
     {
       "name": "users",
@@ -1472,11 +1472,11 @@
       "name": "document_counters",
       "type": "base",
       "apiRules": {
-        "list": null,
-        "view": null,
-        "create": null,
-        "update": null,
-        "delete": null
+        "list": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != \"\" && municipality = @request.auth.municipality && (@request.auth.role = \"administrador\" || @request.auth.role = \"coordenador\")"
       },
       "fields": [
         {
@@ -1528,11 +1528,11 @@
       "name": "doc_templates",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
+        "list": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "delete": "@request.auth.id != \"\" && municipality = @request.auth.municipality && (@request.auth.role = \"administrador\" || @request.auth.role = \"coordenador\")"
       },
       "fields": [
         {

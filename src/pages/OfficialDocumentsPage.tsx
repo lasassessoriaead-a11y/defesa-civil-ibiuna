@@ -257,9 +257,16 @@ export const OfficialDocumentsPage: React.FC = () => {
         setIsPrintOpen(true)
       }
     } catch (err: unknown) {
+      console.error('[OfficialDocuments] Erro ao salvar:', err)
+      const errorMsg =
+        (err as any)?.data?.message ||
+        (err as any)?.response?.message ||
+        (err instanceof Error
+          ? err.message
+          : 'Falha ao gravar no servidor. Verifique a conexão e permissões.')
       toast({
         title: 'Erro ao salvar ofício',
-        description: err instanceof Error ? err.message : 'Falha ao gravar no servidor.',
+        description: `${errorMsg}. Seus dados digitados foram preservados para nova tentativa.`,
         variant: 'destructive',
       })
     } finally {

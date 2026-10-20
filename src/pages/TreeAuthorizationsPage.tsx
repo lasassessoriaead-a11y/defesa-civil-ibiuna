@@ -271,9 +271,14 @@ export const TreeAuthorizationsPage: React.FC = () => {
         setIsPrintOpen(true)
       }
     } catch (err: unknown) {
+      console.error('[TreeAuthorizations] Erro ao salvar:', err)
+      const errorMsg =
+        (err as any)?.data?.message ||
+        (err as any)?.response?.message ||
+        (err instanceof Error ? err.message : 'Falha ao salvar no servidor.')
       toast({
         title: 'Erro ao processar autorização',
-        description: err instanceof Error ? err.message : 'Falha ao salvar no servidor.',
+        description: `${errorMsg}. Seus dados digitados foram preservados para nova tentativa.`,
         variant: 'destructive',
       })
     } finally {
