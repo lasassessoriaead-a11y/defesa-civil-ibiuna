@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-20T12:19:38.633Z",
+  "generatedAt": "2026-10-20T13:28:08.359Z",
   "collections": [
     {
       "name": "users",
@@ -7,7 +7,7 @@
       "apiRules": {
         "list": "@request.auth.id != '' && (id = @request.auth.id || (municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')))",
         "view": "@request.auth.id != '' && (id = @request.auth.id || (municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')))",
-        "create": "",
+        "create": null,
         "update": "@request.auth.id != '' && ((id = @request.auth.id && @request.body.role:changed = false && @request.body.municipality:changed = false) || (@request.auth.role = 'administrador' && municipality = @request.auth.municipality))",
         "delete": "@request.auth.id != '' && @request.auth.role = 'administrador' && municipality = @request.auth.municipality && id != @request.auth.id"
       },
@@ -69,6 +69,12 @@
             "administracao",
             "outras"
           ]
+        },
+        {
+          "name": "is_active",
+          "type": "bool",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [

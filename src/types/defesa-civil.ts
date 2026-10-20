@@ -710,6 +710,9 @@ export interface User {
   role?: UserRole
   department?: DepartmentKey
   municipality?: string
+  is_active?: boolean
+  created?: string
+  updated?: string
   expand?: {
     municipality?: Municipality
   }

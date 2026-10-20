@@ -208,6 +208,52 @@ export const usersService = {
   async update(id: string, data: Partial<User>) {
     return pb.collection('users').update<User>(id, data)
   },
+  // Operações Administrativas isoladas por Prefeitura (Backend Hooks autenticados)
+  async adminCreate(params: {
+    name: string
+    email: string
+    password: string
+    role: UserRole
+    department?: string
+  }): Promise<{ success: boolean; user: User }> {
+    const res = await pb.send('/backend/v1/users/admin-create', {
+      method: 'POST',
+      body: JSON.stringify(params),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    return res as { success: boolean; user: User }
+  },
+  async adminUpdate(params: {
+    id: string
+    name?: string
+    role?: UserRole
+    department?: string
+    is_active?: boolean
+  }): Promise<{ success: boolean; user: User }> {
+    const res = await pb.send('/backend/v1/users/admin-update', {
+      method: 'POST',
+      body: JSON.stringify(params),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    return res as { success: boolean; user: User }
+  },
+  async adminResetPassword(params: {
+    id: string
+    password: string
+  }): Promise<{ success: boolean; message: string }> {
+    const res = await pb.send('/backend/v1/users/admin-reset-password', {
+      method: 'POST',
+      body: JSON.stringify(params),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    })
+    return res as { success: boolean; message: string }
+  },
 }
 
 // Occurrences com suporte a cache de leitura e offline
