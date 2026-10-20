@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-19T16:32:40.092Z",
+  "generatedAt": "2026-10-20T01:54:52.761Z",
   "collections": [
     {
       "name": "users",
@@ -1775,10 +1775,10 @@
       "name": "risk_sectors",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "list": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
         "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
@@ -1992,10 +1992,10 @@
       "name": "danger_stretches",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "list": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
         "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
@@ -2184,10 +2184,10 @@
       "name": "strategic_infrastructures",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "list": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
         "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
@@ -2639,10 +2639,10 @@
       "name": "geo_imports",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "list": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
         "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
@@ -3127,10 +3127,10 @@
       "name": "geo_layers",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "create": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
-        "update": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "list": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
         "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
