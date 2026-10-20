@@ -16,6 +16,7 @@ import type {
   OccurrenceFile,
   AuditLogEntry,
   User,
+  UserRole,
   DocTemplate,
   OfficialDocument,
   TreeAuthorization,

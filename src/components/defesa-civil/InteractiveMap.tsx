@@ -36,6 +36,7 @@ import { getGoogleEarthUrl, generateKmlDocument, downloadKmlFile } from '@/lib/k
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import pb from '@/lib/pocketbase/client'
+import { MapQuickRegisterModal, type QuickRegisterMode } from './MapQuickRegisterModal'
 import type {
   Occurrence,
   Shelter,
@@ -157,7 +158,7 @@ function getAreaStyle(riskLevel: string, status?: string) {
   }
 }
 
-// Controller component to handle map clicks for picking coords or drawing polygons
+// Controller component to handle map clicks for picking coords, drawing polygons or opening context menu
 interface MapEventsHandlerProps {
   interactivePick?: boolean
   onPickCoordinate?: (lat: number, lng: number) => void
@@ -165,6 +166,8 @@ interface MapEventsHandlerProps {
   polygonPoints?: [number, number][]
   onPolygonChange?: (points: [number, number][]) => void
   onViewportChange?: (center: [number, number], zoom: number) => void
+  onOpenContextMenu?: (lat: number, lng: number, containerPoint: { x: number; y: number }) => void
+  onCloseContextMenu?: () => void
 }
 
 const MapEventsHandler: React.FC<MapEventsHandlerProps> = ({
@@ -174,9 +177,14 @@ const MapEventsHandler: React.FC<MapEventsHandlerProps> = ({
   polygonPoints = [],
   onPolygonChange,
   onViewportChange,
+  onOpenContextMenu,
+  onCloseContextMenu,
 }) => {
-  useMapEvents({
+  const map = useMapEvents({
     click(e) {
+      // Fecha menu de contexto ao clicar em qualquer ponto do mapa
+      onCloseContextMenu?.()
+
       const lat = Number(e.latlng.lat.toFixed(5))
       const lng = Number(e.latlng.lng.toFixed(5))
 
@@ -188,6 +196,17 @@ const MapEventsHandler: React.FC<MapEventsHandlerProps> = ({
       if (interactivePick && onPickCoordinate) {
         onPickCoordinate(lat, lng)
       }
+    },
+    contextmenu(e) {
+      // Clique direito no mapa abre o menu de contexto "Registrar neste local"
+      L.DomEvent.preventDefault(e.originalEvent)
+      const lat = Number(e.latlng.lat.toFixed(6))
+      const lng = Number(e.latlng.lng.toFixed(6))
+      const pt = map.latLngToContainerPoint(e.latlng)
+      onOpenContextMenu?.(lat, lng, { x: pt.x, y: pt.y })
+    },
+    movestart() {
+      onCloseContextMenu?.()
     },
     moveend(e) {
       if (onViewportChange) {
@@ -204,6 +223,68 @@ const MapEventsHandler: React.FC<MapEventsHandlerProps> = ({
       }
     },
   })
+
+  // Suporte a Toque Longo (Mobile / Tablet) diretamente no container do Leaflet
+  useEffect(() => {
+    const container = map.getContainer()
+    let touchTimer: any = null
+    let touchStartPos: { x: number; y: number } | null = null
+    let touchMoved = false
+
+    const handleTouchStart = (ev: TouchEvent) => {
+      if (ev.touches.length !== 1) return
+      const touch = ev.touches[0]
+      touchStartPos = { x: touch.clientX, y: touch.clientY }
+      touchMoved = false
+
+      touchTimer = setTimeout(() => {
+        if (!touchMoved && touchStartPos) {
+          const rect = container.getBoundingClientRect()
+          const containerX = touchStartPos.x - rect.left
+          const containerY = touchStartPos.y - rect.top
+          const latlng = map.containerPointToLatLng(L.point(containerX, containerY))
+          const lat = Number(latlng.lat.toFixed(6))
+          const lng = Number(latlng.lng.toFixed(6))
+          onOpenContextMenu?.(lat, lng, { x: containerX, y: containerY })
+        }
+      }, 600) // 600ms para caracterizar toque longo sem conflito com pan
+    }
+
+    const handleTouchMove = (ev: TouchEvent) => {
+      if (!touchStartPos) return
+      const touch = ev.touches[0]
+      const dist = Math.hypot(touch.clientX - touchStartPos.x, touch.clientY - touchStartPos.y)
+      if (dist > 10) {
+        touchMoved = true
+        if (touchTimer) {
+          clearTimeout(touchTimer)
+          touchTimer = null
+        }
+      }
+    }
+
+    const handleTouchEnd = () => {
+      if (touchTimer) {
+        clearTimeout(touchTimer)
+        touchTimer = null
+      }
+      touchStartPos = null
+    }
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: true })
+    container.addEventListener('touchmove', handleTouchMove, { passive: true })
+    container.addEventListener('touchend', handleTouchEnd, { passive: true })
+    container.addEventListener('touchcancel', handleTouchEnd, { passive: true })
+
+    return () => {
+      if (touchTimer) clearTimeout(touchTimer)
+      container.removeEventListener('touchstart', handleTouchStart)
+      container.removeEventListener('touchmove', handleTouchMove)
+      container.removeEventListener('touchend', handleTouchEnd)
+      container.removeEventListener('touchcancel', handleTouchEnd)
+    }
+  }, [map, onOpenContextMenu])
+
   return null
 }
 
@@ -403,6 +484,34 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
   const [baseMapMode, setBaseMapMode] = useState<'map' | 'satellite' | 'hybrid'>(() => {
     return (localStorage.getItem('ibiuna_base_map_mode') as any) || 'map'
   })
+
+  // Estado do Menu de Contexto "Registrar neste local" (Clique Direito / Toque Longo)
+  const [contextMenu, setContextMenu] = useState<{
+    visible: boolean
+    lat: number
+    lng: number
+    x: number
+    y: number
+  } | null>(null)
+
+  // Estado do Modal de Registro Rápido
+  const [quickRegisterOpen, setQuickRegisterOpen] = useState(false)
+  const [quickRegisterMode, setQuickRegisterMode] = useState<QuickRegisterMode>('occurrence')
+  const [quickRegisterCoord, setQuickRegisterCoord] = useState<{ lat: number; lng: number }>({
+    lat: -23.655,
+    lng: -47.22,
+  })
+
+  // Fecha menu de contexto com tecla Escape ou clique fora
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setContextMenu(null)
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [])
 
   const handleBaseMapChange = (mode: 'map' | 'satellite' | 'hybrid') => {
     setBaseMapMode(mode)
@@ -690,6 +799,16 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           polygonPoints={polygonPoints}
           onPolygonChange={onPolygonChange}
           onViewportChange={onViewportChange}
+          onOpenContextMenu={(lat, lng, pt) => {
+            setContextMenu({
+              visible: true,
+              lat,
+              lng,
+              x: pt.x,
+              y: pt.y,
+            })
+          }}
+          onCloseContextMenu={() => setContextMenu(null)}
         />
         <CustomMapControls defaultCenter={validCenter} defaultZoom={zoom} />
 
@@ -1886,6 +2005,139 @@ export const InteractiveMap: React.FC<InteractiveMapProps> = ({
           </span>
         </div>
       )}
+
+      {/* Menu de Contexto "Registrar neste local" (Clique Direito ou Toque Longo) */}
+      {contextMenu && contextMenu.visible && (
+        <div
+          className="absolute z-[1000] bg-white rounded-lg shadow-xl border border-slate-300 py-1 min-w-[210px] animate-in fade-in zoom-in-95 duration-100 text-xs"
+          style={{
+            left: `${Math.min(Math.max(contextMenu.x, 10), (typeof window !== 'undefined' ? window.innerWidth : 800) - 230)}px`,
+            top: `${Math.max(contextMenu.y - 10, 10)}px`,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-3 py-1.5 border-b border-slate-100 bg-slate-50/70 rounded-t-lg">
+            <div className="flex items-center gap-1.5 font-bold text-slate-800 text-[11px]">
+              <MapPin className="w-3.5 h-3.5 text-blue-600" />
+              <span>Registrar neste local</span>
+            </div>
+            <div className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
+              {contextMenu.lat.toFixed(5)}, {contextMenu.lng.toFixed(5)}
+            </div>
+          </div>
+
+          <div className="p-1 space-y-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                const targetCoord = { lat: contextMenu.lat, lng: contextMenu.lng }
+                setContextMenu(null)
+                setQuickRegisterCoord(targetCoord)
+                setQuickRegisterMode('occurrence')
+                setQuickRegisterOpen(true)
+              }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-red-50 text-slate-700 hover:text-red-700 font-medium text-left transition-colors"
+            >
+              <div className="w-2 h-2 rounded-full bg-red-600 shrink-0" />
+              <div className="flex flex-col">
+                <span className="font-semibold text-xs">Nova Ocorrência</span>
+                <span className="text-[10px] text-slate-400">Enchente, deslizamento, queda...</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const targetCoord = { lat: contextMenu.lat, lng: contextMenu.lng }
+                setContextMenu(null)
+                setQuickRegisterCoord(targetCoord)
+                setQuickRegisterMode('bridge')
+                setQuickRegisterOpen(true)
+              }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-emerald-50 text-slate-700 hover:text-emerald-800 font-medium text-left transition-colors"
+            >
+              <div className="w-2 h-2 rounded-full bg-emerald-600 shrink-0" />
+              <div className="flex flex-col">
+                <span className="font-semibold text-xs">Nova Ponte / Aduela</span>
+                <span className="text-[10px] text-slate-400">Padrão PM-XXX municipal</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const targetCoord = { lat: contextMenu.lat, lng: contextMenu.lng }
+                setContextMenu(null)
+                setQuickRegisterCoord(targetCoord)
+                setQuickRegisterMode('risk_sector')
+                setQuickRegisterOpen(true)
+              }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-orange-50 text-slate-700 hover:text-orange-800 font-medium text-left transition-colors"
+            >
+              <div className="w-2 h-2 rounded-full bg-orange-500 shrink-0" />
+              <div className="flex flex-col">
+                <span className="font-semibold text-xs">Nova Área de Risco</span>
+                <span className="text-[10px] text-slate-400">Centro inicial + raio / polígono</span>
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                const targetCoord = { lat: contextMenu.lat, lng: contextMenu.lng }
+                setContextMenu(null)
+                setQuickRegisterCoord(targetCoord)
+                setQuickRegisterMode('danger_stretch')
+                setQuickRegisterOpen(true)
+              }}
+              className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-md hover:bg-blue-50 text-slate-700 hover:text-blue-800 font-medium text-left transition-colors"
+            >
+              <div className="w-2 h-2 rounded-full bg-blue-600 shrink-0" />
+              <div className="flex flex-col">
+                <span className="font-semibold text-xs">Novo Trecho de Perigo</span>
+                <span className="text-[10px] text-slate-400">Ponto inicial + linha na via</span>
+              </div>
+            </button>
+          </div>
+
+          <div className="px-2 pt-1 pb-0.5 border-t border-slate-100 flex items-center justify-between text-[10px] text-slate-400">
+            <span>Toque fora ou Esc p/ fechar</span>
+            <button
+              type="button"
+              onClick={() => setContextMenu(null)}
+              className="text-slate-500 hover:text-slate-800 hover:underline"
+            >
+              Fechar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Unificado de Cadastro Rápido no Local */}
+      <MapQuickRegisterModal
+        open={quickRegisterOpen}
+        onOpenChange={setQuickRegisterOpen}
+        initialMode={quickRegisterMode}
+        coordinate={quickRegisterCoord}
+        existingOccurrences={occurrences}
+        existingInfrastructures={strategicInfrastructures}
+        existingRiskSectors={geoRiskSectors}
+        existingDangerStretches={geoDangerStretches}
+        onSuccess={(createdType, record) => {
+          // Atualiza dados locais caso necessário e redireciona se aplicável
+          if (createdType === 'occurrence') {
+            navigate(`/ocorrencias?id=${encodeURIComponent(record.id)}`)
+          } else if (createdType === 'bridge') {
+            navigate(`/infraestruturas-estrategicas?id=${encodeURIComponent(record.id)}`)
+          } else if (createdType === 'risk_sector' || createdType === 'danger_stretch') {
+            setGeoRiskSectors((prev) => (createdType === 'risk_sector' ? [record, ...prev] : prev))
+            setGeoDangerStretches((prev) =>
+              createdType === 'danger_stretch' ? [record, ...prev] : prev,
+            )
+            navigate(`/setores-risco?id=${encodeURIComponent(record.id || record.code)}`)
+          }
+        }}
+      />
     </div>
   )
 }
