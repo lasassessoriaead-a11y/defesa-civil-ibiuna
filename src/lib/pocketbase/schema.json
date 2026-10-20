@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-20T02:31:36.382Z",
+  "generatedAt": "2026-10-20T12:19:38.633Z",
   "collections": [
     {
       "name": "users",
@@ -1365,10 +1365,10 @@
       "name": "audit_log",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
-        "view": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')",
+        "list": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
         "create": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
-        "update": null,
+        "update": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
         "delete": null
       },
       "fields": [
@@ -3746,10 +3746,10 @@
       "name": "urban_consultations",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "list": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
         "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [
@@ -4309,10 +4309,10 @@
       "name": "contingency_plans",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "view": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "create": "@request.auth.id != '' && municipality = @request.auth.municipality",
-        "update": "@request.auth.id != '' && municipality = @request.auth.municipality",
+        "list": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "view": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "create": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
+        "update": "@request.auth.id != \"\" && municipality = @request.auth.municipality",
         "delete": "@request.auth.id != '' && municipality = @request.auth.municipality && (@request.auth.role = 'administrador' || @request.auth.role = 'coordenador')"
       },
       "fields": [

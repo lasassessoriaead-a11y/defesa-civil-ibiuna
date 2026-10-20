@@ -261,13 +261,15 @@ export const UrbanDevelopmentPage: React.FC = () => {
 
     let result: UrbanIntersectionResult = 'nenhuma_intersecao_encontrada'
 
-    // Se não há geometrias salvas no banco (492 ainda ausentes) ou se o polígono tem menos de 3 pontos
-    if (sectorsWithGeo === 0 && (!pointCoords || !pointCoords[0])) {
+    // Diretriz Técnica: Se a base geográfica estiver indisponível ou incompleta (ex: setores sem geometria vinculada),
+    // NUNCA retornar "nenhuma interseção encontrada" nesses casos — ausência de geometria não significa ausência de risco.
+    const isBaseIncompleteOrUnavailable = sectorsWithGeo === 0 || riskSectors.length === 0
+    if (isBaseIncompleteOrUnavailable) {
+      result = 'inconclusiva_informacao_insuficiente'
+    } else if (polygonRings.length < 3 && (!pointCoords || !pointCoords[0])) {
       result = 'inconclusiva_informacao_insuficiente'
     } else if (hits.length > 0) {
       result = 'intersecao_encontrada'
-    } else if (polygonRings.length < 3 && (!pointCoords || !pointCoords[0])) {
-      result = 'inconclusiva_informacao_insuficiente'
     } else {
       result = 'nenhuma_intersecao_encontrada'
     }
@@ -320,7 +322,7 @@ export const UrbanDevelopmentPage: React.FC = () => {
           ? 'Interseção encontrada na base consultada'
           : analysis.result === 'nenhuma_intersecao_encontrada'
             ? 'Nenhuma interseção encontrada na base consultada'
-            : 'Consulta inconclusiva — informação insuficiente ou incompatível'
+            : 'Consulta inconclusiva — base geográfica indisponível ou incompleta'
       }`,
     })
   }
@@ -938,9 +940,9 @@ export const UrbanDevelopmentPage: React.FC = () => {
                     <span>
                       {intersectionAnalysis.result === 'intersecao_encontrada'
                         ? 'Interseção encontrada na base consultada'
-                        : intersectionAnalysis.result === 'nenhuma_intersecao_encontrada'
+                        : item.intersection_result === 'nenhuma_intersecao_encontrada'
                           ? 'Nenhuma interseção encontrada na base consultada'
-                          : 'Consulta inconclusiva — informação insuficiente ou incompatível'}
+                          : 'Consulta inconclusiva — base geográfica indisponível ou incompleta'}{' '}
                     </span>
                   </div>
 
@@ -1048,7 +1050,7 @@ export const UrbanDevelopmentPage: React.FC = () => {
                       ? 'Interseção encontrada na base consultada'
                       : selectedConsultation.intersection_result === 'nenhuma_intersecao_encontrada'
                         ? 'Nenhuma interseção encontrada na base consultada'
-                        : 'Consulta inconclusiva — informação insuficiente ou incompatível'}
+                        : 'Consulta inconclusiva — base geográfica indisponível ou incompleta'}
                   </p>
 
                   {selectedConsultation.intersection_details?.intersections &&

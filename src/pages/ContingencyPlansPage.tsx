@@ -99,6 +99,9 @@ export const ContingencyPlansPage: React.FC = () => {
   const [formSorocaba, setFormSorocaba] = useState('')
   const [formSources, setFormSources] = useState('')
   const [approverName, setApproverName] = useState('')
+  const [approvalDocType, setApprovalDocType] = useState('decreto')
+  const [approvalDocNumber, setApprovalDocNumber] = useState('')
+  const [approvalDocDate, setApprovalDocDate] = useState('')
   const [approvalDoc, setApprovalDoc] = useState('')
 
   // Modal de Referência Oficial (Biblioteca Estadual)
@@ -182,6 +185,9 @@ export const ContingencyPlansPage: React.FC = () => {
       'Relatório Síntese IPT 2024, Base de Pontes e Aduelas da Defesa Civil Municipal.',
     )
     setApproverName('')
+    setApprovalDocType('decreto')
+    setApprovalDocNumber('')
+    setApprovalDocDate('')
     setApprovalDoc('')
     setIsEditorOpen(true)
   }
@@ -220,7 +226,17 @@ export const ContingencyPlansPage: React.FC = () => {
     setFormSorocaba(plan.sorocaba_workshop_commitments || '')
     setFormSources(plan.information_sources || '')
     setApproverName(plan.approver_name || '')
-    setApprovalDoc(plan.approval_document_ref || '')
+    const ref = plan.approval_document_ref || ''
+    setApprovalDoc(ref)
+    if (ref) {
+      if (ref.toLowerCase().includes('portaria')) setApprovalDocType('portaria')
+      else if (ref.toLowerCase().includes('resolu')) setApprovalDocType('resolucao')
+      else if (ref.toLowerCase().includes('lei')) setApprovalDocType('lei')
+      else if (ref.toLowerCase().includes('despacho')) setApprovalDocType('despacho')
+      else setApprovalDocType('decreto')
+    }
+    setApprovalDocNumber(ref)
+    setApprovalDocDate(plan.approval_date || '')
     setIsEditorOpen(true)
   }
 
@@ -231,13 +247,18 @@ export const ContingencyPlansPage: React.FC = () => {
       return
     }
 
-    // Regra: Não apresentar preenchimento de modelo como aprovado sem ato legal
-    if (formStatus === 'aprovado_vigente' && !approvalDoc.trim()) {
+    // Regra: Não apresentar preenchimento de modelo como aprovado sem ato legal.
+    // Aceita tipo (Decreto, Portaria, Resolução, Lei, Despacho, etc.), número, data e autoridade competente.
+    const fullApprovalRef = approvalDocNumber.trim()
+      ? `${approvalDocType.toUpperCase()} nº ${approvalDocNumber.trim()}${approvalDocDate ? ` de ${approvalDocDate}` : ''}`
+      : approvalDoc.trim()
+
+    if (formStatus === 'aprovado_vigente' && !fullApprovalRef.trim()) {
       toast({
         variant: 'destructive',
         title: 'Aprovação exige documento oficial',
         description:
-          'Informe o número do Decreto, Portaria ou Documento de Homologação para status aprovado.',
+          'Informe o documento de aprovação com tipo (decreto, portaria, resolução, etc.), número e autoridade competente.',
       })
       return
     }
@@ -263,9 +284,10 @@ export const ContingencyPlansPage: React.FC = () => {
         sorocaba_workshop_commitments: formSorocaba,
         information_sources: formSources,
         approver_name: approverName.trim() || undefined,
-        approval_document_ref: approvalDoc.trim() || undefined,
+        approval_document_ref: fullApprovalRef.trim() || undefined,
         approval_date:
-          formStatus === 'aprovado_vigente' ? new Date().toISOString().slice(0, 10) : undefined,
+          approvalDocDate.trim() ||
+          (formStatus === 'aprovado_vigente' ? new Date().toISOString().slice(0, 10) : undefined),
         parent_plan_id:
           selectedPlan && selectedPlan.status === 'aprovado_vigente' ? selectedPlan.id : undefined,
         created_by: user?.id,
@@ -899,13 +921,20 @@ export const ContingencyPlansPage: React.FC = () => {
               </TabsContent>
 
               <TabsContent value="aprovacao" className="space-y-3 pt-2">
+                <div className="p-3 bg-slate-50 border border-slate-200 rounded-lg text-slate-700 text-[11px] leading-relaxed">
+                  <strong>Diretriz Técnica de Aprovação Formal:</strong> O sistema aceita qualquer
+                  modalidade válida de ato normativo municipal (Decreto, Portaria, Resolução, Lei ou
+                  Despacho Homologatório) emitido pela autoridade competente. O preenchimento do
+                  plano isoladamente não configura aprovação automática.
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <Label className="text-xs font-semibold text-slate-700">
-                      Autoridade Aprovadora
+                      Autoridade Competente Aprovadora *
                     </Label>
                     <Input
-                      placeholder="Ex: Prefeito Municipal / Coordenador da COMPDEC"
+                      placeholder="Ex: Prefeito Municipal / Coordenador da COMPDEC / Secretário"
                       value={approverName}
                       onChange={(e) => setApproverName(e.target.value)}
                       className="mt-1 text-xs"
@@ -913,12 +942,47 @@ export const ContingencyPlansPage: React.FC = () => {
                   </div>
                   <div>
                     <Label className="text-xs font-semibold text-slate-700">
-                      Ato Oficial de Homologação
+                      Tipo de Ato Legal / Documento
+                    </Label>
+                    <Select value={approvalDocType} onValueChange={setApprovalDocType}>
+                      <SelectTrigger className="mt-1 text-xs">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="decreto">Decreto Municipal</SelectItem>
+                        <SelectItem value="portaria">Portaria</SelectItem>
+                        <SelectItem value="resolucao">Resolução</SelectItem>
+                        <SelectItem value="lei">Lei Municipal</SelectItem>
+                        <SelectItem value="despacho">Despacho Homologatório</SelectItem>
+                        <SelectItem value="outro">Outro Ato Formal</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-semibold text-slate-700">
+                      Número / Identificação do Ato
                     </Label>
                     <Input
-                      placeholder="Ex: Decreto Municipal nº 1234/2026"
-                      value={approvalDoc}
-                      onChange={(e) => setApprovalDoc(e.target.value)}
+                      placeholder="Ex: 5.678/2026 ou Gabinete nº 12"
+                      value={approvalDocNumber}
+                      onChange={(e) => {
+                        setApprovalDocNumber(e.target.value)
+                        setApprovalDoc(e.target.value)
+                      }}
+                      className="mt-1 text-xs"
+                    />
+                  </div>
+                  <div>
+                    <Label className="text-xs font-semibold text-slate-700">
+                      Data da Publicação / Assinatura
+                    </Label>
+                    <Input
+                      type="date"
+                      value={approvalDocDate}
+                      onChange={(e) => setApprovalDocDate(e.target.value)}
                       className="mt-1 text-xs"
                     />
                   </div>
